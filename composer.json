@@ -1,0 +1,36 @@
+{
+    "name": "angeo/module-llms-txt",
+    "version": "1.0.0",
+    "description": "",
+    "keywords": [
+        "magento2",
+        "magento module",
+        "angeo",
+        "ai",
+        "chatGpt"
+    ],
+    "homepage": "https://angeo.dev/",
+    "support": {
+      "email": "support@angeo.dev"
+    },
+    "author": {
+        "name": "Ievgenii Gryshkun",
+        "email": "info@angeo.dev",
+        "homepage": "https://angeo.dev/"
+    },
+    "type": "magento2-module",
+    "require": {
+        "magento/framework": "*"
+    },
+    "license": [
+        "MIT"
+    ],
+    "autoload": {
+      "files": [
+          "registration.php"
+      ],
+    "psr-4": {
+      "Angeo\\LlmsTxt\\": ""
+    }
+  }
+}

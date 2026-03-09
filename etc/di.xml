@@ -1,0 +1,23 @@
+<?xml version="1.0"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework:ObjectManager/etc/config.xsd">
+    <type name="Angeo\LlmsTxt\Model\JsonlGenerator">
+        <arguments>
+            <argument name="providers" xsi:type="array">
+                <item name="store" xsi:type="object">Angeo\LlmsTxt\Model\Jsonl\Providers\StoreProvider</item>
+                <item name="category" xsi:type="object">Angeo\LlmsTxt\Model\Jsonl\Providers\CategoryProvider</item>
+                <item name="product" xsi:type="object">Angeo\LlmsTxt\Model\Jsonl\Providers\ProductProvider</item>
+                <item name="cms" xsi:type="object">Angeo\LlmsTxt\Model\Jsonl\Providers\CmsPageProvider</item>
+            </argument>
+        </arguments>
+    </type>
+    <type name="Angeo\LlmsTxt\Model\LlmsGenerator">
+        <arguments>
+            <argument name="providers" xsi:type="array">
+                <item name="store" xsi:type="object">Angeo\LlmsTxt\Model\Llms\Providers\StoreProvider</item>
+                <item name="category" xsi:type="object">Angeo\LlmsTxt\Model\Llms\Providers\CategoryProvider</item>
+                <item name="product" xsi:type="object">Angeo\LlmsTxt\Model\Llms\Providers\ProductProvider</item>
+                <item name="cms" xsi:type="object">Angeo\LlmsTxt\Model\Llms\Providers\CmsPageProvider</item>
+            </argument>
+        </arguments>
+    </type>
+</config>

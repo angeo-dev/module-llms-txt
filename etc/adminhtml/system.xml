@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Config:etc/system_file.xsd">
+    <system>
+        <tab id="angeo" translate="label" sortOrder="500" class="angeo-tab">
+            <label>Angeo</label>
+        </tab>
+        <section id="angeo_llms" translate="label" sortOrder="500" showInDefault="1" showInWebsite="0" showInStore="0">
+            <label>LLMS Export</label>
+            <tab>angeo</tab>
+            <resource>Angeo_LlmsTxt::config</resource>
+            <group id="general" translate="label" sortOrder="10" showInDefault="1" showInWebsite="0" showInStore="0">
+                <label>General Settings</label>
+                <field id="generate" translate="label" type="button" sortOrder="10" showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>Generate LLMS Files</label>
+                    <frontend_model>Angeo\LlmsTxt\Block\Adminhtml\System\Config\GenerateButton</frontend_model>
+                </field>
+            </group>
+        </section>
+    </system>
+</config>
