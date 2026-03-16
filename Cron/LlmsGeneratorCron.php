@@ -8,10 +8,10 @@
 
 declare(strict_types=1);
 
-namespace Angeo\LlmsTxt\Cron;
+namespace Angeo\LlmsTxt\LlmsTxt\LlmsTxt\Cron;
 
-use Angeo\Model\JsonlGenerator;
-use Angeo\Model\LlmsGenerator;
+use Angeo\LlmsTxt\LlmsTxt\Model\JsonlGenerator;
+use Angeo\LlmsTxt\LlmsTxt\Model\LlmsGenerator;
 
 class LlmsGeneratorCron
 {

@@ -2,13 +2,12 @@
 
 declare(strict_types=1);
 
-namespace Angeo\Controller\Adminhtml\Generate;
+namespace Angeo\LlmsTxt\Controller\Adminhtml\Generate;
 
-use Angeo\Model\JsonlGenerator;
-use Angeo\Model\LlmsGenerator;
+use Angeo\LlmsTxt\Model\JsonlGenerator;
+use Angeo\LlmsTxt\Model\LlmsGenerator;
 use Magento\Backend\App\Action;
 use Magento\Backend\App\Action\Context;
-use function Angeo\LlmsTxt\Controller\Adminhtml\Generate\__;
 
 class Index extends Action
 {

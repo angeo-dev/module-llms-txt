@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Angeo\Model\Jsonl\Providers;
+namespace Angeo\LlmsTxt\Model\Jsonl\Providers;
 
-use Angeo\Api\Jsonl\DefaultProviderApi;
+use Angeo\LlmsTxt\Api\Jsonl\DefaultProviderApi;
 use Magento\Catalog\Model\ResourceModel\Product\CollectionFactory;
 use Magento\Store\Api\Data\StoreInterface;
 

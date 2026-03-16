@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Angeo\Api\Llms;
+namespace Angeo\LlmsTxt\Api\Llms;
 
 use Magento\Store\Api\Data\StoreInterface;
 

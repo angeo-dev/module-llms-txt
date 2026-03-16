@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Angeo\Model;
+namespace Angeo\LlmsTxt\Model;
 
 use Magento\Framework\App\Filesystem\DirectoryList;
 use Magento\Framework\Filesystem;

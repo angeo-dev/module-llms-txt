@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Angeo\Api;
+namespace Angeo\LlmsTxt\Api;
 
 interface DefaultConfigApi
 {

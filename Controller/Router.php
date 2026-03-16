@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace Angeo\Controller;
+namespace Angeo\LlmsTxt\Controller;
 
-use Angeo\Api\DefaultConfigApi;
-use Angeo\Controller\Index\Index as IndexController;
+use Angeo\LlmsTxt\Api\DefaultConfigApi;
+use Angeo\LlmsTxt\Controller\Index\Index as IndexController;
 use Magento\Framework\App\ActionFactory;
 use Magento\Framework\App\RequestInterface;
 use Magento\Framework\App\RouterInterface;

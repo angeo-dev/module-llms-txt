@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Angeo\Model\Llms\Providers;
+namespace Angeo\LlmsTxt\Model\Llms\Providers;
 
-use Angeo\Api\Llms\DefaultProviderApi;
+use Angeo\LlmsTxt\Api\Llms\DefaultProviderApi;
 use Magento\Cms\Model\ResourceModel\Page\CollectionFactory;
 use Magento\Store\Api\Data\StoreInterface;
 

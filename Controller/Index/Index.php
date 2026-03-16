@@ -2,35 +2,34 @@
 
 declare(strict_types=1);
 
-namespace Angeo\Controller\Index;
+namespace Angeo\LlmsTxt\Controller\Index;
 
-use Magento\Framework\App\Action\Action;
-use Magento\Framework\App\Action\Context;
+use Magento\Framework\App\Action\HttpGetActionInterface;
+use Magento\Framework\App\ActionInterface;
 use Magento\Framework\Controller\Result\RawFactory;
 use Magento\Store\Model\StoreManagerInterface;
-use const Angeo\LlmsTxt\Controller\Index\BP;
+use Magento\Framework\Filesystem;
+use Magento\Framework\App\Filesystem\DirectoryList;
 
-class Index extends Action
+class Index implements ActionInterface, HttpGetActionInterface
 {
     public function __construct(
-        private readonly Context $context,
         private readonly RawFactory $resultRawFactory,
-        private readonly StoreManagerInterface $storeManager
-    ) {
-        parent::__construct($context);
-    }
+        private readonly StoreManagerInterface $storeManager,
+        private readonly Filesystem $filesystem
+    ) {}
 
     public function execute()
     {
         $store = $this->storeManager->getStore();
-        $storeCode = $store->getCode();
 
-        $filePath = BP . "/pub/media/llms_{$storeCode}.txt";
+        $directory = $this->filesystem->getDirectoryWrite(DirectoryList::MEDIA);
+        $filePath = $directory->getAbsolutePath("llms_{$store->getCode()}.txt");
 
         if (!file_exists($filePath)) {
             $result = $this->resultRawFactory->create();
             $result->setHttpResponseCode(404);
-            $result->setContents('LLMS file not generated yet.');
+            $result->setContents(__('LLMS file not generated yet.'));
             return $result;
         }
 

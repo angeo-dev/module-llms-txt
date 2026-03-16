@@ -6,7 +6,7 @@
             <label>Angeo</label>
         </tab>
         <section id="angeo_llms" translate="label" sortOrder="500" showInDefault="1" showInWebsite="0" showInStore="0">
-            <label>LLMS Export</label>
+            <label>LLMS</label>
             <tab>angeo</tab>
             <resource>Angeo_LlmsTxt::config</resource>
             <group id="general" translate="label" sortOrder="10" showInDefault="1" showInWebsite="0" showInStore="0">

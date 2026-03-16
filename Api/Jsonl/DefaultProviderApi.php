@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Angeo\Api\Jsonl;
+namespace Angeo\LlmsTxt\Api\Jsonl;
 
 use Magento\Store\Api\Data\StoreInterface;
 
