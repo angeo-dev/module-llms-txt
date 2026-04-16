@@ -4,42 +4,18 @@ declare(strict_types=1);
 
 namespace Angeo\LlmsTxt\Model;
 
-use Magento\Framework\App\Filesystem\DirectoryList;
-use Magento\Framework\Filesystem;
-use Magento\Framework\Filesystem\Io\File;
-use Magento\Store\Model\StoreManagerInterface;
+use Angeo\LlmsTxt\Model\Generator\AbstractGenerator;
 
-class JsonlGenerator
+/**
+ * Generates JSONL files for vector indexing / embedding pipelines.
+ *
+ * Each line is a valid JSON object with an embedding_text field.
+ * File location: media/angeo/llms/llms_{store_code}.jsonl
+ */
+class JsonlGenerator extends AbstractGenerator
 {
-    public function __construct(
-        private readonly StoreManagerInterface $storeManager,
-        private readonly Filesystem $filesystem,
-        private readonly File $fileIo,
-        private readonly array $providers = []
-    ) {}
-
-    public function generate(): void
+    protected function getExtension(): string
     {
-        $stores = $this->storeManager->getStores();
-        $directory = $this->filesystem->getDirectoryWrite(DirectoryList::MEDIA);
-
-        $output = '';
-        foreach ($stores as $store) {
-
-            if (!$store->isActive()) {
-                continue;
-            }
-
-            foreach ($this->providers as $provider) {
-                $output .= $provider->provide($store);
-            }
-
-            if (empty($output)) {
-                continue;
-            }
-
-            $filePath = $directory->getAbsolutePath("llms_{$store->getCode()}.jsonl");
-            $this->fileIo->write($filePath, $output, 0775);
-        }
+        return 'jsonl';
     }
 }

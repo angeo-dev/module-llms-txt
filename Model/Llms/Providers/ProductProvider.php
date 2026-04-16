@@ -4,12 +4,23 @@ declare(strict_types=1);
 
 namespace Angeo\LlmsTxt\Model\Llms\Providers;
 
-use Angeo\LlmsTxt\Api\Llms\DefaultProviderApi;
+use Angeo\LlmsTxt\Api\ProviderInterface;
+use Magento\Catalog\Model\Product\Attribute\Source\Status;
+use Magento\Catalog\Model\Product\Visibility;
 use Magento\Catalog\Model\ResourceModel\Product\CollectionFactory;
 use Magento\Store\Api\Data\StoreInterface;
 
-class ProductProvider implements DefaultProviderApi
+/**
+ * Generates the ## Products section in llms.txt format.
+ *
+ * Output per llmstxt.org spec:
+ *   ## Products
+ *   - [Product Name](url): short description — $price
+ */
+class ProductProvider implements ProviderInterface
 {
+    private const DESC_MAX_LENGTH = 500;
+
     public function __construct(
         private readonly CollectionFactory $collectionFactory,
         private readonly int $pageSize = 1000
@@ -17,54 +28,59 @@ class ProductProvider implements DefaultProviderApi
 
     public function provide(StoreInterface $store): string
     {
-        $output = "## PRODUCTS\n\n";
-
-        $page = 1;
+        $lines    = [];
+        $page     = 1;
+        $storeId  = (int) $store->getId();
 
         do {
-
-            $products = $this->collectionFactory->create();
-
-            $products->setStoreId($store->getId());
-            $products->addStoreFilter($store->getId());
-
-            $products->addAttributeToSelect([
-                'sku',
-                'name',
-                'price',
-                'short_description',
-                'description',
-                'url_key'
+            $collection = $this->collectionFactory->create();
+            $collection->setStoreId($storeId);
+            $collection->addStoreFilter($storeId);
+            $collection->addAttributeToSelect(['name', 'price', 'short_description', 'url_key']);
+            $collection->addAttributeToFilter('status', Status::STATUS_ENABLED);
+            $collection->addAttributeToFilter('visibility', [
+                'in' => [Visibility::VISIBILITY_IN_CATALOG, Visibility::VISIBILITY_IN_SEARCH, Visibility::VISIBILITY_BOTH],
             ]);
+            $collection->addUrlRewrite();
+            $collection->setPageSize($this->pageSize);
+            $collection->setCurPage($page);
 
-            $products->addAttributeToFilter('status', 1);
-            $products->addAttributeToFilter('visibility', ['in' => [2,3,4]]);
+            $lastPage = $collection->getLastPageNumber();
 
-            $products->setPageSize($this->pageSize);
-            $products->setCurPage($page);
+            foreach ($collection as $product) {
+                $name  = trim((string) $product->getName());
+                $url   = $product->getProductUrl();
+                $price = $product->getPrice();
+                $desc  = $this->cleanText((string) $product->getShortDescription(), self::DESC_MAX_LENGTH);
 
-            $products->load();
+                $suffix = [];
+                if ($desc) {
+                    $suffix[] = $desc;
+                }
+                if ($price > 0) {
+                    $suffix[] = number_format((float) $price, 2) . ' ' . $store->getCurrentCurrencyCode();
+                }
 
-            foreach ($products as $product) {
-
-                $short = strip_tags((string)$product->getShortDescription());
-                $desc = strip_tags((string)$product->getDescription());
-
-                $output .= "TYPE: PRODUCT\n";
-                $output .= "NAME: {$product->getName()}\n";
-                $output .= "SKU: {$product->getSku()}\n";
-                $output .= "URL: {$product->getProductUrl()}\n";
-                $output .= "PRICE: {$product->getPrice()}\n";
-                $output .= "SHORT_DESCRIPTION: " . substr($short, 0, 1000) . "\n";
-                $output .= "DESCRIPTION: " . substr($desc, 0, 3000) . "\n";
-                $output .= "\n";
+                $line    = "- [{$name}]({$url})";
+                $line   .= !empty($suffix) ? ': ' . implode(' — ', $suffix) : '';
+                $lines[] = $line;
             }
 
+            $collection->clear();
             $page++;
-            $products->clear();
 
-        } while ($page <= $products->getLastPageNumber());
+        } while ($page <= $lastPage);
 
-        return $output;
+        if (empty($lines)) {
+            return '';
+        }
+
+        return "## Products\n\n" . implode("\n", $lines) . "\n\n";
+    }
+
+    private function cleanText(string $text, int $maxLength): string
+    {
+        $clean = preg_replace('/\s+/', ' ', strip_tags($text));
+        return mb_substr(trim((string) $clean), 0, $maxLength);
     }
 }

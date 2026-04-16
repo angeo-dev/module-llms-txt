@@ -4,11 +4,18 @@ declare(strict_types=1);
 
 namespace Angeo\LlmsTxt\Model\Llms\Providers;
 
-use Angeo\LlmsTxt\Api\Llms\DefaultProviderApi;
+use Angeo\LlmsTxt\Api\ProviderInterface;
 use Magento\Catalog\Model\ResourceModel\Category\CollectionFactory;
 use Magento\Store\Api\Data\StoreInterface;
 
-class CategoryProvider implements DefaultProviderApi
+/**
+ * Generates the ## Categories section in llms.txt format.
+ *
+ * Output per llmstxt.org spec:
+ *   ## Categories
+ *   - [Category Name](https://store.com/cat): Short description
+ */
+class CategoryProvider implements ProviderInterface
 {
     public function __construct(
         private readonly CollectionFactory $categoryCollectionFactory
@@ -16,18 +23,9 @@ class CategoryProvider implements DefaultProviderApi
 
     public function provide(StoreInterface $store): string
     {
-        $output = "## CATEGORY DATA\n\n";
-
         $collection = $this->categoryCollectionFactory->create();
-
         $collection->setStoreId($store->getId());
-        $collection->addAttributeToSelect([
-            'name',
-            'description',
-            'url_key',
-            'parent_id'
-        ]);
-
+        $collection->addAttributeToSelect(['name', 'description', 'url_key']);
         $collection->addAttributeToFilter('is_active', 1);
 
         $collection->addAttributeToFilter(
@@ -35,19 +33,33 @@ class CategoryProvider implements DefaultProviderApi
             ['like' => '1/' . $store->getRootCategoryId() . '/%']
         );
 
+        $lines = [];
         foreach ($collection as $category) {
+            $name = trim((string) $category->getName());
+            if (!$name) {
+                continue;
+            }
 
-            $description = strip_tags((string)$category->getDescription());
-            $description = preg_replace('/\s+/', ' ', $description);
+            $url  = $category->getUrl();
+            $desc = $this->cleanText((string) $category->getDescription(), 200);
 
-            $output .= "TYPE: CATEGORY\n";
-            $output .= "NAME: {$category->getName()}\n";
-            $output .= "URL: {$category->getUrl()}\n";
-            $output .= "PARENT_ID: {$category->getParentId()}\n";
-            $output .= "DESCRIPTION: " . substr($description, 0, 2000) . "\n";
-            $output .= "\n";
+            // Spec format: - [Name](url): description
+            $line  = "- [{$name}]({$url})";
+            $line .= $desc ? ": {$desc}" : '';
+            $lines[] = $line;
         }
 
-        return $output;
+        if (empty($lines)) {
+            return '';
+        }
+
+        return "## Categories\n\n" . implode("\n", $lines) . "\n\n";
+    }
+
+    private function cleanText(string $text, int $maxLength): string
+    {
+        $clean = preg_replace('/\s+/', ' ', strip_tags($text));
+        $clean = trim((string) $clean);
+        return $clean ? mb_substr($clean, 0, $maxLength) : '';
     }
 }

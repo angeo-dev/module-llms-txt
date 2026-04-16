@@ -14,9 +14,9 @@ class Index extends Action
     public const ADMIN_RESOURCE = 'Angeo_LlmsTxt::config';
 
     public function __construct(
-        private readonly Context $context,
-        private readonly LlmsGenerator $llmsGenerator,
-        private readonly JsonlGenerator $jsonlGenerator
+        Context $context,
+        private readonly LlmsGenerator  $llmsGenerator,
+        private readonly JsonlGenerator $jsonlGenerator,
     ) {
         parent::__construct($context);
     }
@@ -28,12 +28,11 @@ class Index extends Action
             $this->jsonlGenerator->generate();
 
             $this->messageManager->addSuccessMessage(
-                __('LLMS TXT and JSONL files generated successfully for all stores.')
+                __('llms.txt and JSONL files generated successfully for all active stores.')
             );
-
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             $this->messageManager->addErrorMessage(
-                __('Error during generation: %1', $e->getMessage())
+                __('Generation failed: %1', $e->getMessage())
             );
         }
 

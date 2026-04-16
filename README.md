@@ -1,30 +1,38 @@
-# Angeo LLMs.txt Generator for Magento 2
+# Angeo LLMs.txt — Magento 2
 
-**AI-Optimized LLMs.txt Generator for Magento 2 Stores | Multi-Store & Cron Support**
-
-[![Packagist Version](https://img.shields.io/packagist/v/angeo/module-llms-txt.svg)](https://packagist.org/packages/angeo/module-llms-txt)
+[![Packagist](https://img.shields.io/packagist/v/angeo/module-llms-txt.svg)](https://packagist.org/packages/angeo/module-llms-txt)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![PHP](https://img.shields.io/badge/php-%3E%3D8.2-8892BF.svg)](https://php.net)
+
+**Generates spec-compliant `llms.txt` and JSONL files for ChatGPT, Claude, Gemini, and Perplexity AI visibility.**
 
 ---
 
-## 🚀 Overview
+## What's new in v2.0.0
 
-Angeo LLMs.txt is a Magento 2 module that automatically generates **AI-friendly `llms.txt` files** and **structured `llms.ljson`files** for your eCommerce store. This module helps AI systems like ChatGPT, Claude, Gemini, and other large language models (LLMs) understand your site structure and content for **better indexing, AI recommendations, and enhanced visibility**.
-
-Key features:
-
-- Generates **structured `llms.txt`** and **structured `llms.ljson`** files for products, categories, CMS pages, and stores.
-- Supports **multi-store and multi-language Magento 2 installations**.
-- Manual generation from **Magento Admin panel**.
-- **Cron-enabled automation** for scheduled updates.
-
-> `llms.txt` is a new, AI-focused standard similar to `robots.txt` or `sitemap.xml`, designed to improve AI visibility and context understanding for your store content.
+- **4 critical bugs fixed** — see Bug fixes section below
+- **Spec-compliant format** — output now follows [llmstxt.org](https://llmstxt.org) with H1 title, `##` sections, and markdown links
+- **`bin/magento angeo:llms:generate`** — CLI command (was missing in v1)
+- **Files in `var/`** — moved from `pub/media/` (publicly browsable) to `pub/media/angeo/llms/` (served via PHP controller)
+- **`AbstractGenerator`** — eliminates 95% duplicate code between `LlmsGenerator` and `JsonlGenerator`
+- **Single `ProviderInterface`** — replaces two identical interfaces from v1
+- **Per-store exception safety** — one failing store doesn't block others; errors logged
+- **Admin config** — enable/disable per store, product limit, toggle JSONL generation
 
 ---
 
-## 📦 Installation
+## Bug fixes (v1 → v2)
 
-Install via Composer in your Magento 2 root:
+| Bug | Impact | Fix |
+|-----|--------|-----|
+| JSONL providers: `json_encode()` after `foreach` | Only the **last** category/product/page was encoded — all others silently dropped | Moved `json_encode()` inside loop; lines collected into array |
+| `Cron` namespace triple-nested (`LlmsTxt\LlmsTxt\LlmsTxt\Cron`) | PHP fatal error on every cron run — cron never executed | Fixed to `Angeo\LlmsTxt\Cron` |
+| `$output` initialized before store loop | Store N's file contained content from stores 1…N merged | Moved `$output = ''` inside the store loop |
+| `Jsonl\CategoryProvider` missing root category filter | Returned system categories (ID 1, 2) and categories from all store views | Added `path LIKE 1/{rootId}/%` filter (same as Llms version) |
+
+---
+
+## Installation
 
 ```bash
 composer require angeo/module-llms-txt
@@ -34,104 +42,137 @@ bin/magento cache:flush
 
 ---
 
-## ⚙️ Configuration
+## Usage
 
-After installation, you can generate LLMS.txt and LLMS.jsonl files:
-
-```
-Stores → Configuration → General → Angeo → LLMS
-```
-
-Options include:
-
-- Manual generation from the backend
-
----
-
-## 📆 Cron Automation
-
-The module supports automatic scheduled generation via Magento cron. Ensure your server cron jobs are configured:
+### CLI (recommended for CI/CD and first-time generation)
 
 ```bash
-bin/magento cron:run
+# Generate for all active stores
+bin/magento angeo:llms:generate
+
+# Generate for a specific store
+bin/magento angeo:llms:generate --store=en_us
+
+# Skip JSONL (llms.txt only)
+bin/magento angeo:llms:generate --no-jsonl
+
+# Skip llms.txt (JSONL only)
+bin/magento angeo:llms:generate --no-llms
+```
+
+### Admin UI
+
+Navigate to **Stores → Configuration → Angeo → LLMs.txt** and click **Generate Now**.
+
+### Cron
+
+Runs automatically every day at 02:00 server time. Verify your Magento cron is active:
+
+```bash
+bin/magento cron:run --group=default
 ```
 
 ---
 
-## 🧾 llms.txt Structure
+## Generated files
 
-The generated file typically includes:
+Files are written to `pub/media/angeo/llms/` and served via a PHP controller:
 
-- Store name and description
-- Key product categories
-- Product URLs
-- CMS pages
+| URL | File | Description |
+|-----|------|-------------|
+| `yourstore.com/llms.txt` | `pub/media/angeo/llms/llms_default.txt` | Spec-compliant llms.txt for AI crawlers |
+| `yourstore.com/llms.jsonl` | `pub/media/angeo/llms/llms_default.jsonl` | JSONL for vector indexing pipelines |
 
-**Example:**
+For multi-store: each store gets its own file (`llms_en_us.txt`, `llms_de.txt`, etc.) served at the store's base URL.
+
+---
+
+## llms.txt format (llmstxt.org spec)
 
 ```
-# Store: My Magento Store
+# EN
 
-## STORE
-Name: TEST Store
-URL: https://teststore.com/
-Currency: USD
+> Store URL: https://angeo.test
+> Currency: USD
+> Locale: en
 
-### CATEGORIES ###
-Category ID: 3
-Name: All products
-Parent ID: 2
-URL: https://teststore.com/all-products
-Description: test description
+## Categories
 
-### PRODUCTS ###
-SKU: test
-Name: test
-Price: 100.000000
-URL: https://teststore.com/test
-Short Description: test short description
-Description: test description
+- [All products](https://angeo.test/all-products.html)
+- [Sale](https://angeo.test/sale.html)
 
-## CMS PAGES
+## Products
 
-TYPE: PAGE
-TITLE: 404 Not Found
-URL: https://teststore.com/no-route
-CONTENT:  The page you requested was not found, and we have a fine guess why. If you typed the URL directly, please make sure the spelling is correct. If you clicked on a link to get here, the link is outdated. What can you do? Have no fear, help is near! There are many ways you can get back on track with Magento Store. Go back to the previous page. Use the search bar at the top of the page to search for your products. Follow these links to get you back on track!Store Home | My Account 
+- [test](https://angeo.test/test1.html): 100.00 USD
+- [test2](https://angeo.test/test2.html): 20.00 USD
+- [test3](https://angeo.test/test3.html): 30.00 USD
 
-TYPE: PAGE
-TITLE: Home page
-URL: https://teststore.com/home
-CONTENT: CMS homepage content goes here. 
+## Pages
+
+- [Home page](https://angeo.test/home): CMS homepage content goes here.
 ```
 
-This helps AI systems **understand your store context and product catalog** for improved recommendations, search results, and AI-driven features.
+---
+
+## Configuration
+
+**Stores → Configuration → Angeo → LLMs.txt**
+
+| Setting | Description | Default |
+|---------|-------------|---------|
+| Enabled | Enable/disable module | Yes |
+| Include Products | Add `## Products` section | Yes |
+| Include Categories | Add `## Categories` section | Yes |
+| Include CMS Pages | Add `## Pages` section | Yes |
+| Generate JSONL | Also generate `.jsonl` file | Yes |
+| Product limit | Max products to include (0 = unlimited) | 5000 |
 
 ---
 
-## 📈 Benefits
+## Extending with custom providers
 
-- Improve **AI indexing and recommendations**.
-- Provide structured content for LLMs.
-- Fully **Magento 2 multi-store and multi-language compatible**.
-- Easy manual or automated updates via cron or backend.
-- Open-source, MIT-licensed for easy adoption and modification.
+Register additional content sections via `di.xml`:
+
+```xml
+<type name="Angeo\LlmsTxt\Model\LlmsGenerator">
+    <arguments>
+        <argument name="providers" xsi:type="array">
+            <item name="my_custom" xsi:type="object">Vendor\Module\Model\Llms\Providers\MyProvider</item>
+        </argument>
+    </arguments>
+</type>
+```
+
+Your provider implements `Angeo\LlmsTxt\Api\ProviderInterface`:
+
+```php
+public function provide(StoreInterface $store): string
+{
+    return "## My Section\n\n- [Item](url): description\n\n";
+}
+```
 
 ---
 
-## 🧪 Testing
+## Testing
 
-The module includes unit tests to ensure:
-
-- Correct `llms.txt` generation
-- Correct `llms.ljson` generation
-
----
-
-## 📄 License
-
-This module is released under the **MIT License**.
+```bash
+vendor/bin/phpunit -c app/code/Angeo/LlmsTxt/phpunit.xml
+```
 
 ---
 
-**Keywords for SEO / discoverability:** Magento 2, LLMs.txt, AI-friendly store file, AI optimization, AI recommendations, large language models, ChatGPT, Claude, Gemini, multi-store Magento, cron generation, Magento 2 AI module, AI content indexing.
+## The Angeo AI Suite
+
+| Module | Purpose |
+|--------|---------|
+| `angeo/module-aeo-audit` | AEO audit — 8 signals scored |
+| `angeo/module-llms-txt` | **This module** — llms.txt generator |
+| `angeo/module-openai-product-feed` | CSV product feed |
+| `angeo/module-openai-product-feed-api` | ACP REST API |
+
+---
+
+## License
+
+MIT — see [LICENSE](LICENSE)

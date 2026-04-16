@@ -9,11 +9,15 @@ use Magento\Framework\Data\Form\Element\AbstractElement;
 
 class GenerateButton extends Field
 {
-    protected function _getElementHtml(AbstractElement $element)
+    protected function _getElementHtml(AbstractElement $element): string
     {
         $url = $this->getUrl('angeo_llms/generate');
-        return '<button type="button" onclick="setLocation(\''.$url.'\')" class="scalable save">
-                    Generate LLMS Files
-                </button>';
+        return sprintf(
+            '<button type="button" onclick="setLocation(\'%s\')" class="scalable save primary">%s</button>
+             <p class="note"><span>%s</span></p>',
+            $url,
+            __('Generate llms.txt + JSONL'),
+            __('Generates files for all active stores. Files are served at yourstore.com/llms.txt')
+        );
     }
 }

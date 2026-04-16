@@ -1,7 +1,10 @@
 <?xml version="1.0"?>
-<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework:Module/etc/crontab.xsd">
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:framework:Module/etc/crontab.xsd">
     <group id="default">
-        <job name="angeo_llms_generate" instance="Angeo\LlmsTxt\Cron\LlmsGeneratorCron" method="execute">
+        <job name="angeo_llms_generate"
+             instance="Angeo\LlmsTxt\Cron\LlmsGeneratorCron"
+             method="execute">
             <schedule>0 2 * * *</schedule>
         </job>
     </group>

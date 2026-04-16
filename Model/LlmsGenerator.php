@@ -4,42 +4,27 @@ declare(strict_types=1);
 
 namespace Angeo\LlmsTxt\Model;
 
-use Magento\Framework\App\Filesystem\DirectoryList;
-use Magento\Framework\Filesystem;
-use Magento\Framework\Filesystem\Io\File;
-use Magento\Store\Model\StoreManagerInterface;
+use Angeo\LlmsTxt\Model\Generator\AbstractGenerator;
 
-class LlmsGenerator
+/**
+ * Generates spec-compliant llms.txt (and llms-full.txt) files per store.
+ *
+ * Output format follows llmstxt.org specification:
+ *   # Store Name                    ← required H1
+ *   > Short store description       ← optional blockquote
+ *
+ *   ## Products                     ← H2 sections
+ *   - [Product Name](url): desc
+ *
+ *   ## Categories
+ *   - [Category](url): desc
+ *
+ * File location: media/angeo/llms/llms_{store_code}.txt
+ */
+class LlmsGenerator extends AbstractGenerator
 {
-    public function __construct(
-        private readonly StoreManagerInterface $storeManager,
-        private readonly Filesystem $filesystem,
-        private readonly File $fileIo,
-        private readonly array $providers = []
-    ) {}
-
-    public function generate(): void
+    protected function getExtension(): string
     {
-        $stores = $this->storeManager->getStores();
-        $directory = $this->filesystem->getDirectoryWrite(DirectoryList::MEDIA);
-
-        $output = '';
-        foreach ($stores as $store) {
-
-            if (!$store->isActive()) {
-                continue;
-            }
-
-            foreach ($this->providers as $provider) {
-                $output .= $provider->provide($store);
-            }
-
-            if (empty($output)) {
-                continue;
-            }
-
-            $filePath = $directory->getAbsolutePath("llms_{$store->getCode()}.txt");
-            $this->fileIo->write($filePath, $output, 0775);
-        }
+        return 'txt';
     }
 }

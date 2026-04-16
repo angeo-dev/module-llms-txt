@@ -1,25 +1,22 @@
 {
     "name": "angeo/module-llms-txt",
-    "version": "1.1.2",
-    "description": "Magento 2 module for AI Engine Optimization (AEO). Automatically generates llms.txt and AI-friendly store maps for ChatGPT, Claude, Perplexity AI, and other AI search engines. Multi-store, cron-ready, and CLI supported.",
+    "version": "2.0.0",
+    "description": "Magento 2 module for AI Engine Optimization (AEO). Generates spec-compliant llms.txt and llms-full.txt per llmstxt.org standard, plus JSONL for vector indexing. Multi-store, CLI, cron, Admin UI.",
     "keywords": [
         "magento2",
         "magento module",
         "angeo",
-        "ai",
-        "chatgpt",
         "aeo",
-        "seo",
-        "llms",
         "llms.txt",
         "ai-commerce",
         "ai-search",
-        "product-feed"
+        "chatgpt",
+        "claude",
+        "gemini"
     ],
     "homepage": "https://angeo.dev/",
     "support": {
-        "email": "support@angeo.dev",
-        "issues": "https://github.com/angeo/module-llms-txt/issues"
+        "email": "support@angeo.dev"
     },
     "authors": [
         {
@@ -30,17 +27,26 @@
     ],
     "type": "magento2-module",
     "require": {
-        "magento/framework": "*"
+        "php": ">=8.2",
+        "magento/framework": "*",
+        "magento/module-store": "*",
+        "magento/module-catalog": "*",
+        "magento/module-cms": "*",
+        "magento/module-backend": "*"
     },
-    "license": [
-        "MIT"
-    ],
+    "require-dev": {
+        "phpunit/phpunit": "^10.0"
+    },
+    "license": ["MIT"],
     "autoload": {
-        "files": [
-            "registration.php"
-        ],
+        "files": ["registration.php"],
         "psr-4": {
             "Angeo\\LlmsTxt\\": ""
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Angeo\\LlmsTxt\\Test\\": "Test/"
         }
     }
 }

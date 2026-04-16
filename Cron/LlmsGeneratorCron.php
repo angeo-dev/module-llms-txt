@@ -1,28 +1,33 @@
 <?php
 
-/**
- * @copyright Copyright (c) 2026 Ievgenii Gryshkun
- * @author    Ievgenii Gryshkun <info@angeo.dev>
- * @license   MIT
- */
-
 declare(strict_types=1);
 
-namespace Angeo\LlmsTxt\LlmsTxt\LlmsTxt\Cron;
+namespace Angeo\LlmsTxt\Cron;
 
-use Angeo\LlmsTxt\LlmsTxt\Model\JsonlGenerator;
-use Angeo\LlmsTxt\LlmsTxt\Model\LlmsGenerator;
+use Angeo\LlmsTxt\Model\JsonlGenerator;
+use Angeo\LlmsTxt\Model\LlmsGenerator;
+use Psr\Log\LoggerInterface;
 
+/**
+ * Daily scheduled generation of llms.txt and JSONL files.
+ */
 class LlmsGeneratorCron
 {
     public function __construct(
-        private readonly LlmsGenerator $llmsGenerator,
-        private readonly JsonlGenerator $jsonlGenerator
+        private readonly LlmsGenerator  $llmsGenerator,
+        private readonly JsonlGenerator $jsonlGenerator,
+        private readonly LoggerInterface $logger,
     ) {}
 
     public function execute(): void
     {
-        $this->llmsGenerator->generate();
-        $this->jsonlGenerator->generate();
+        try {
+            $this->llmsGenerator->generate();
+            $this->jsonlGenerator->generate();
+        } catch (\Throwable $e) {
+            $this->logger->error('[Angeo LlmsTxt] Cron generation failed: ' . $e->getMessage(), [
+                'exception' => $e,
+            ]);
+        }
     }
 }
