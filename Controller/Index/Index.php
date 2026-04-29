@@ -4,14 +4,15 @@ declare(strict_types=1);
 
 namespace Angeo\LlmsTxt\Controller\Index;
 
-use Magento\Framework\Controller\Result\Raw;
-use Magento\Framework\Controller\Result\RawFactory;
+use Angeo\LlmsTxt\Model\Config;
 use Angeo\LlmsTxt\Model\JsonlGenerator;
 use Angeo\LlmsTxt\Model\LlmsGenerator;
 use Magento\Framework\App\Action\HttpGetActionInterface;
 use Magento\Framework\App\ActionInterface;
 use Magento\Framework\App\RequestInterface;
 use Magento\Framework\App\ResponseInterface;
+use Magento\Framework\Controller\Result\Raw;
+use Magento\Framework\Controller\Result\RawFactory;
 use Magento\Store\Model\StoreManagerInterface;
 
 /**
@@ -39,9 +40,8 @@ class Index implements ActionInterface, HttpGetActionInterface
         private readonly JsonlGenerator        $jsonlGenerator,
         private readonly RequestInterface      $request,
         private readonly RawFactory            $resultRawFactory,
-    )
-    {
-    }
+        private readonly Config                $config,
+    ) {}
 
     public function execute(): Raw|ResponseInterface
     {
@@ -50,15 +50,27 @@ class Index implements ActionInterface, HttpGetActionInterface
         $llmsFile = (string)$this->request->getParam('llms_file', 'llms.txt');
         $type = self::FILE_MAP[$llmsFile] ?? 'txt';
 
+        // Return 404 if module is disabled globally.
+        if (!$this->config->isEnabled()) {
+            $this->response->setHttpResponseCode(404);
+            $this->response->setBody("Not found.\n");
+            return $this->response;
+        }
+
+        // Return 404 immediately if the store is disabled or excluded — do not serve stale files.
+        if (!$store->isActive() || $this->config->isStoreExcluded($store)) {
+            $this->response->setHttpResponseCode(404);
+            $this->response->setBody("Store is not available.\n");
+            return $this->response;
+        }
+
         $filePath = $type === 'jsonl'
             ? $this->jsonlGenerator->getFilePath($storeCode)
             : $this->llmsGenerator->getFilePath($storeCode);
 
         if (!is_file($filePath)) {
             $this->response->setHttpResponseCode(404);
-            $this->response->setBody(
-                "{$llmsFile} not generated yet.\n\n"
-            );
+            $this->response->setBody("{$llmsFile} not generated yet.\n\n");
             return $this->response;
         }
 

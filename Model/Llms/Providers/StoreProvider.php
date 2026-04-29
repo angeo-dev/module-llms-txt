@@ -19,6 +19,8 @@ use Magento\Store\Model\ScopeInterface;
  */
 class StoreProvider implements ProviderInterface
 {
+    private const XML_PATH_LOCALE = 'general/locale/code';
+
     public function __construct(
         private readonly ScopeConfigInterface $scopeConfig
     ) {}
@@ -26,7 +28,21 @@ class StoreProvider implements ProviderInterface
     public function provide(StoreInterface $store): string
     {
         $name = $store->getName();
-        $url  = rtrim((string) $store->getBaseUrl(), '/');
+
+        // Bug fix: getBaseUrl() without type returns admin URL when called from cron/CLI.
+        // Explicitly request the frontend base URL.
+        $url = rtrim(
+            (string) $store->getBaseUrl(\Magento\Framework\UrlInterface::URL_TYPE_WEB),
+            '/'
+        );
+
+        // Bug fix: getLocaleCode() returns null in many Magento versions.
+        // Read locale directly from store-scoped config.
+        $locale = str_replace('_', '-', (string) $this->scopeConfig->getValue(
+            self::XML_PATH_LOCALE,
+            ScopeInterface::SCOPE_STORE,
+            $store->getId()
+        ));
 
         // H1 title — required by llmstxt.org spec
         $output  = "# {$name}\n\n";
@@ -34,7 +50,7 @@ class StoreProvider implements ProviderInterface
         // Store metadata as detail lines
         $output .= "> Store URL: {$url}\n";
         $output .= "> Currency: {$store->getCurrentCurrencyCode()}\n";
-        $output .= "> Locale: {$store->getLocaleCode()}\n";
+        $output .= "> Locale: {$locale}\n";
         $output .= "\n";
 
         return $output;

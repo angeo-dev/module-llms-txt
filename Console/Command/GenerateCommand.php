@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Angeo\LlmsTxt\Console\Command;
 
+use Angeo\LlmsTxt\Model\Config;
 use Angeo\LlmsTxt\Model\JsonlGenerator;
 use Angeo\LlmsTxt\Model\LlmsGenerator;
 use Magento\Store\Model\StoreManagerInterface;
@@ -14,14 +15,15 @@ use Symfony\Component\Console\Output\OutputInterface;
 
 class GenerateCommand extends Command
 {
-    private const OPT_STORE   = 'store';
+    private const OPT_STORE    = 'store';
     private const OPT_NO_JSONL = 'no-jsonl';
     private const OPT_NO_LLMS  = 'no-llms';
 
     public function __construct(
-        private readonly LlmsGenerator $llmsGenerator,
-        private readonly JsonlGenerator $jsonlGenerator,
+        private readonly LlmsGenerator         $llmsGenerator,
+        private readonly JsonlGenerator        $jsonlGenerator,
         private readonly StoreManagerInterface $storeManager,
+        private readonly Config                $config,
     ) {
         parent::__construct();
     }
@@ -45,11 +47,30 @@ class GenerateCommand extends Command
         $output->writeln('<info>Angeo LLMs.txt Generator</info>');
         $output->writeln('');
 
+        if (!$this->config->isEnabled()) {
+            $output->writeln('<comment>Module is disabled in Stores → Configuration → Angeo → LLMs.txt</comment>');
+            return Command::SUCCESS;
+        }
+
         $stores = $storeCode
             ? [$this->storeManager->getStore($storeCode)]
             : $this->storeManager->getStores();
 
         $active = array_filter(iterator_to_array($stores), fn($s) => $s->isActive());
+
+        // Filter out stores excluded in config (unless a specific store was requested)
+        if (!$storeCode) {
+            $active = array_filter($active, function ($store) use ($output) {
+                if ($this->config->isStoreExcluded($store)) {
+                    $output->writeln(sprintf(
+                        '  <comment>Skipping %s</comment> (excluded in Stores → Configuration → Angeo → LLMs.txt)',
+                        $store->getCode()
+                    ));
+                    return false;
+                }
+                return true;
+            });
+        }
 
         if (empty($active)) {
             $output->writeln('<comment>No active stores found.</comment>');

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Angeo\LlmsTxt\Model\Generator;
 
 use Angeo\LlmsTxt\Api\ProviderInterface;
+use Angeo\LlmsTxt\Model\Config;
 use Magento\Framework\App\Filesystem\DirectoryList;
 use Magento\Framework\Exception\FileSystemException;
 use Magento\Framework\Filesystem;
@@ -19,6 +20,7 @@ abstract class AbstractGenerator
         protected readonly StoreManagerInterface $storeManager,
         protected readonly Filesystem $filesystem,
         protected readonly LoggerInterface $logger,
+        protected readonly Config $config,
         protected readonly array $providers = [],
     ) {}
 
@@ -42,6 +44,11 @@ abstract class AbstractGenerator
      */
     public function generate(?string $storeCode = null): void
     {
+        if (!$this->config->isEnabled()) {
+            $this->logger->info('[Angeo LlmsTxt] Module is disabled — generation skipped.');
+            return;
+        }
+
         $stores = $storeCode
             ? [$this->storeManager->getStore($storeCode)]
             : $this->storeManager->getStores();
@@ -50,7 +57,18 @@ abstract class AbstractGenerator
         $directory->create($this->getSubDir());
 
         foreach ($stores as $store) {
-            if (!$store->isActive()) {
+            if (!$store->isActive() || $this->config->isStoreExcluded($store)) {
+                // Clean up stale file if store is now disabled or excluded.
+                $this->deleteStaleFile($store, $directory);
+
+                if (!$store->isActive()) {
+                    continue;
+                }
+
+                $this->logger->info(sprintf(
+                    '[Angeo LlmsTxt] Skipping store %s (excluded in config)',
+                    $store->getCode()
+                ));
                 continue;
             }
 
@@ -116,5 +134,32 @@ abstract class AbstractGenerator
         return $directory->getAbsolutePath(
             $this->getSubDir() . "/llms_{$storeCode}.{$this->getExtension()}"
         );
+    }
+
+    /**
+     * Delete the generated file for a store if it exists (called when store is disabled or excluded).
+     */
+    protected function deleteStaleFile(StoreInterface $store, $directory): void
+    {
+        $relativePath = $this->getSubDir() . "/llms_{$store->getCode()}.{$this->getExtension()}";
+
+        if (!$directory->isExist($relativePath)) {
+            return;
+        }
+
+        try {
+            $directory->delete($relativePath);
+            $this->logger->info(sprintf(
+                '[Angeo LlmsTxt] Deleted stale file %s for store %s',
+                $relativePath,
+                $store->getCode()
+            ));
+        } catch (\Throwable $e) {
+            $this->logger->warning(sprintf(
+                '[Angeo LlmsTxt] Could not delete stale file %s: %s',
+                $relativePath,
+                $e->getMessage()
+            ));
+        }
     }
 }

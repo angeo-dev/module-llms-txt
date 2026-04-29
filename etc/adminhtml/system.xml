@@ -5,13 +5,23 @@
         <tab id="angeo" translate="label" sortOrder="500" class="angeo-tab">
             <label>Angeo</label>
         </tab>
-        <section id="angeo_llms" translate="label" sortOrder="500" showInDefault="1" showInWebsite="0" showInStore="0">
+        <section id="angeo_llms" translate="label" sortOrder="500" showInDefault="1" showInWebsite="1" showInStore="1">
             <label>LLMS</label>
             <tab>angeo</tab>
             <resource>Angeo_LlmsTxt::config</resource>
-            <group id="general" translate="label" sortOrder="10" showInDefault="1" showInWebsite="0" showInStore="0">
+            <group id="general" translate="label" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="1">
                 <label>General Settings</label>
-                <field id="generate" translate="label" type="button" sortOrder="10" showInDefault="1" showInWebsite="0" showInStore="0">
+                <field id="enabled" translate="label comment" type="select" sortOrder="10" showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>Enable Module</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment>Enable or disable llms.txt and JSONL generation globally.</comment>
+                </field>
+                <field id="exclude_store" translate="label comment" type="select" sortOrder="20" showInDefault="0" showInWebsite="0" showInStore="1">
+                    <label>Exclude This Store from Generation</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment>When enabled, this store view will be skipped during llms.txt and JSONL generation (cron and manual).</comment>
+                </field>
+                <field id="generate" translate="label" type="button" sortOrder="30" showInDefault="1" showInWebsite="0" showInStore="0">
                     <label>Generate LLMS Files</label>
                     <frontend_model>Angeo\LlmsTxt\Block\Adminhtml\System\Config\GenerateButton</frontend_model>
                 </field>

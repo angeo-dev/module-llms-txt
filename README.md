@@ -6,29 +6,8 @@
 
 **Generates spec-compliant `llms.txt` and JSONL files for ChatGPT, Claude, Gemini, and Perplexity AI visibility.**
 
----
-
-## What's new in v2.0.0
-
-- **4 critical bugs fixed** — see Bug fixes section below
-- **Spec-compliant format** — output now follows [llmstxt.org](https://llmstxt.org) with H1 title, `##` sections, and markdown links
-- **`bin/magento angeo:llms:generate`** — CLI command (was missing in v1)
-- **Files in `var/`** — moved from `pub/media/` (publicly browsable) to `pub/media/angeo/llms/` (served via PHP controller)
-- **`AbstractGenerator`** — eliminates 95% duplicate code between `LlmsGenerator` and `JsonlGenerator`
-- **Single `ProviderInterface`** — replaces two identical interfaces from v1
-- **Per-store exception safety** — one failing store doesn't block others; errors logged
-- **Admin config** — enable/disable per store, product limit, toggle JSONL generation
-
----
-
-## Bug fixes (v1 → v2)
-
-| Bug | Impact | Fix |
-|-----|--------|-----|
-| JSONL providers: `json_encode()` after `foreach` | Only the **last** category/product/page was encoded — all others silently dropped | Moved `json_encode()` inside loop; lines collected into array |
-| `Cron` namespace triple-nested (`LlmsTxt\LlmsTxt\LlmsTxt\Cron`) | PHP fatal error on every cron run — cron never executed | Fixed to `Angeo\LlmsTxt\Cron` |
-| `$output` initialized before store loop | Store N's file contained content from stores 1…N merged | Moved `$output = ''` inside the store loop |
-| `Jsonl\CategoryProvider` missing root category filter | Returned system categories (ID 1, 2) and categories from all store views | Added `path LIKE 1/{rootId}/%` filter (same as Llms version) |
+Part of the **[Angeo AI Commerce Suite](https://packagist.org/packages/angeo/)** — open-source Magento 2 modules for AI Engine Optimization (AEO).  
+GitHub: [github.com/angeo-dev](https://github.com/angeo-dev) · Website: [angeo.dev](https://angeo.dev)
 
 ---
 
@@ -44,7 +23,7 @@ bin/magento cache:flush
 
 ## Usage
 
-### CLI (recommended for CI/CD and first-time generation)
+### CLI
 
 ```bash
 # Generate for all active stores
@@ -62,11 +41,11 @@ bin/magento angeo:llms:generate --no-llms
 
 ### Admin UI
 
-Navigate to **Stores → Configuration → Angeo → LLMs.txt** and click **Generate Now**.
+**Stores → Configuration → Angeo → LLMs.txt** → click **Generate Now**.
 
 ### Cron
 
-Runs automatically every day at 02:00 server time. Verify your Magento cron is active:
+Runs automatically every day at 02:00 server time. Each store is emulated in `AREA_FRONTEND` context so that URLs and locale always resolve to correct frontend values.
 
 ```bash
 bin/magento cron:run --group=default
@@ -78,38 +57,38 @@ bin/magento cron:run --group=default
 
 Files are written to `pub/media/angeo/llms/` and served via a PHP controller:
 
-| URL | File | Description |
-|-----|------|-------------|
-| `yourstore.com/llms.txt` | `pub/media/angeo/llms/llms_default.txt` | Spec-compliant llms.txt for AI crawlers |
-| `yourstore.com/llms.jsonl` | `pub/media/angeo/llms/llms_default.jsonl` | JSONL for vector indexing pipelines |
+| URL | File |
+|-----|------|
+| `yourstore.com/llms.txt` | `pub/media/angeo/llms/llms_default.txt` |
+| `yourstore.com/llms.jsonl` | `pub/media/angeo/llms/llms_default.jsonl` |
 
-For multi-store: each store gets its own file (`llms_en_us.txt`, `llms_de.txt`, etc.) served at the store's base URL.
+Multi-store: each store gets its own file (`llms_en_us.txt`, `llms_de.txt`, etc.) served at the store's base URL.
 
 ---
 
-## llms.txt format (llmstxt.org spec)
+## llms.txt format
+
+Output follows the [llmstxt.org](https://llmstxt.org) spec — H1 title, metadata block, `##` sections with markdown links:
 
 ```
-# EN
+# My Store
 
-> Store URL: https://angeo.test
+> Store URL: https://mystore.com
 > Currency: USD
-> Locale: en
+> Locale: en-US
 
 ## Categories
 
-- [All products](https://angeo.test/all-products.html)
-- [Sale](https://angeo.test/sale.html)
+- [All products](https://mystore.com/all-products.html)
+- [Sale](https://mystore.com/sale.html)
 
 ## Products
 
-- [test](https://angeo.test/test1.html): 100.00 USD
-- [test2](https://angeo.test/test2.html): 20.00 USD
-- [test3](https://angeo.test/test3.html): 30.00 USD
+- [Product name](https://mystore.com/product.html): 99.00 USD
 
 ## Pages
 
-- [Home page](https://angeo.test/home): CMS homepage content goes here.
+- [About us](https://mystore.com/about): About page description.
 ```
 
 ---
@@ -118,14 +97,15 @@ For multi-store: each store gets its own file (`llms_en_us.txt`, `llms_de.txt`, 
 
 **Stores → Configuration → Angeo → LLMs.txt**
 
-| Setting | Description | Default |
-|---------|-------------|---------|
-| Enabled | Enable/disable module | Yes |
-| Include Products | Add `## Products` section | Yes |
-| Include Categories | Add `## Categories` section | Yes |
-| Include CMS Pages | Add `## Pages` section | Yes |
-| Generate JSONL | Also generate `.jsonl` file | Yes |
-| Product limit | Max products to include (0 = unlimited) | 5000 |
+| Setting | Scope | Description | Default |
+|---------|-------|-------------|---------|
+| Enabled | Global | Enable/disable the module | Yes |
+| Exclude This Store | Store View | Skip this store from generation | No |
+| Include Products | Store View | Add `## Products` section | Yes |
+| Include Categories | Store View | Add `## Categories` section | Yes |
+| Include CMS Pages | Store View | Add `## Pages` section | Yes |
+| Generate JSONL | Store View | Also generate `.jsonl` file | Yes |
+| Product limit | Store View | Max products (0 = unlimited) | 5000 |
 
 ---
 
@@ -143,7 +123,7 @@ Register additional content sections via `di.xml`:
 </type>
 ```
 
-Your provider implements `Angeo\LlmsTxt\Api\ProviderInterface`:
+Implement `Angeo\LlmsTxt\Api\ProviderInterface`:
 
 ```php
 public function provide(StoreInterface $store): string
@@ -162,14 +142,30 @@ vendor/bin/phpunit -c app/code/Angeo/LlmsTxt/phpunit.xml
 
 ---
 
-## The Angeo AI Suite
+## The Angeo AI Commerce Suite
 
-| Module | Purpose |
-|--------|---------|
-| `angeo/module-aeo-audit` | AEO audit — 8 signals scored |
-| `angeo/module-llms-txt` | **This module** — llms.txt generator |
-| `angeo/module-openai-product-feed` | CSV product feed |
-| `angeo/module-openai-product-feed-api` | ACP REST API |
+Free, MIT-licensed Magento 2 modules — [packagist.org/packages/angeo](https://packagist.org/packages/angeo/) · [github.com/angeo-dev](https://github.com/angeo-dev)
+
+| Module | Packagist | Purpose |
+|--------|-----------|---------|
+| `angeo/module-aeo-audit` | [↗](https://packagist.org/packages/angeo/module-aeo-audit) | CLI AEO audit — 8 signals scored |
+| `angeo/module-llms-txt` | [↗](https://packagist.org/packages/angeo/module-llms-txt) | **This module** — llms.txt + JSONL generator |
+| `angeo/module-openai-product-feed` | [↗](https://packagist.org/packages/angeo/module-openai-product-feed) | ChatGPT Shopping CSV product feed |
+| `angeo/module-openai-product-feed-api` | [↗](https://packagist.org/packages/angeo/module-openai-product-feed-api) | ACP REST API — 6 endpoints |
+| `angeo/module-rich-data` | [↗](https://packagist.org/packages/angeo/module-rich-data) | JSON-LD schema — Product, Organization, FAQ, Breadcrumb |
+
+Install the full suite:
+
+```bash
+composer require angeo/module-aeo-audit angeo/module-llms-txt angeo/module-openai-product-feed angeo/module-openai-product-feed-api angeo/module-rich-data
+bin/magento setup:upgrade && bin/magento cache:flush
+```
+
+---
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md).
 
 ---
 

@@ -1,6 +1,6 @@
 {
     "name": "angeo/module-llms-txt",
-    "version": "2.0.0",
+    "version": "2.1.0",
     "description": "Magento 2 module for AI Engine Optimization (AEO). Generates spec-compliant llms.txt and llms-full.txt per llmstxt.org standard, plus JSONL for vector indexing. Multi-store, CLI, cron, Admin UI.",
     "keywords": [
         "magento2",
@@ -27,7 +27,7 @@
     ],
     "type": "magento2-module",
     "require": {
-        "php": ">=8.2",
+        "php": ">=8.1",
         "magento/framework": "*",
         "magento/module-store": "*",
         "magento/module-catalog": "*",
