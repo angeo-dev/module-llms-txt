@@ -6,7 +6,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
-## [2.1.2] — 2025-04-29
+## [2.1.3] — 2025-04-29
 
 ### Added
 - `Model/Config.php` — central config helper with `isEnabled()` and `isStoreExcluded()` methods

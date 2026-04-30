@@ -6,10 +6,13 @@ namespace Angeo\LlmsTxt\Model\Generator;
 
 use Angeo\LlmsTxt\Api\ProviderInterface;
 use Angeo\LlmsTxt\Model\Config;
+use Magento\Framework\App\Area;
 use Magento\Framework\App\Filesystem\DirectoryList;
 use Magento\Framework\Exception\FileSystemException;
 use Magento\Framework\Filesystem;
+use Magento\Framework\View\DesignInterface;
 use Magento\Store\Api\Data\StoreInterface;
+use Magento\Store\Model\App\Emulation;
 use Magento\Store\Model\StoreManagerInterface;
 use Psr\Log\LoggerInterface;
 
@@ -18,10 +21,12 @@ abstract class AbstractGenerator
     /** @param ProviderInterface[] $providers */
     public function __construct(
         protected readonly StoreManagerInterface $storeManager,
-        protected readonly Filesystem $filesystem,
-        protected readonly LoggerInterface $logger,
-        protected readonly Config $config,
-        protected readonly array $providers = [],
+        protected readonly Filesystem            $filesystem,
+        protected readonly LoggerInterface       $logger,
+        protected readonly Config                $config,
+        protected readonly Emulation             $emulation,
+        protected readonly DesignInterface       $viewDesign,
+        protected readonly array                 $providers = [],
     ) {}
 
     /**
@@ -58,7 +63,6 @@ abstract class AbstractGenerator
 
         foreach ($stores as $store) {
             if (!$store->isActive() || $this->config->isStoreExcluded($store)) {
-                // Clean up stale file if store is now disabled or excluded.
                 $this->deleteStaleFile($store, $directory);
 
                 if (!$store->isActive()) {
@@ -72,7 +76,22 @@ abstract class AbstractGenerator
                 continue;
             }
 
+            $emulated = false;
             try {
+                // Ensure design area is initialized before emulation.
+                // In cron context viewDesign->getArea() returns null which causes
+                // storeCurrentEnvironmentInfo() to save null initialDesign,
+                // making _restoreInitialDesign() fail with TypeError on stop.
+                if (!$this->viewDesign->getArea()) {
+                    $this->viewDesign->setArea(Area::AREA_FRONTEND);
+                }
+
+                $this->emulation->startEnvironmentEmulation(
+                    (int) $store->getId(),
+                    Area::AREA_FRONTEND,
+                    true
+                );
+                $emulated = true;
                 $this->generateForStore($store, $directory);
             } catch (\Throwable $e) {
                 $this->logger->error(sprintf(
@@ -81,6 +100,10 @@ abstract class AbstractGenerator
                     $store->getCode(),
                     $e->getMessage()
                 ));
+            } finally {
+                if ($emulated) {
+                    $this->emulation->stopEnvironmentEmulation();
+                }
             }
         }
     }
