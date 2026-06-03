@@ -42,7 +42,7 @@
         "magento/module-cms": "^104.0",
         "magento/module-backend": "^102.0",
         "magento/module-config": "^101.2",
-        "magento/module-url-rewrite": "^101.2",
+        "magento/module-url-rewrite": "^101.2 || ^102.0",
         "magento/module-catalog-url-rewrite": "^100.4",
         "magento/module-catalog-inventory": "^100.4"
     },
