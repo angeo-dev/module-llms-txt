@@ -1,8 +1,8 @@
 {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "$id": "https://angeo.dev/schema/llms-txt/jsonl/3.0.0.json",
+    "$id": "https://angeo.dev/schema/llms-txt/jsonl/4.0.0.json",
     "title": "Angeo LLMs.txt JSONL Record",
-    "description": "One record per line in llms_{store}.jsonl. Used for vector indexing.",
+    "description": "One record per line in llms_{store}.jsonl. Used for vector indexing and for agent-facing product data.",
     "type": "object",
     "required": ["entity_type", "entity_id", "store_code", "url", "embedding_text"],
     "properties": {
@@ -14,6 +14,10 @@
         "store_code":  { "type": "string", "minLength": 1 },
         "store_name":  { "type": "string" },
         "url":         { "type": "string", "format": "uri" },
+        "md_url": {
+            "type": ["string", "null"],
+            "description": "Markdown mirror of the same page (llms.txt v2). Null when mirrors are not served."
+        },
         "currency":    { "type": "string", "pattern": "^[A-Z]{3}$" },
         "locale":      { "type": "string" },
         "sku":         { "type": "string" },
@@ -21,6 +25,20 @@
         "title":       { "type": "string" },
         "identifier":  { "type": "string" },
         "price":       { "type": "number", "minimum": 0 },
+        "in_stock": {
+            "type": "boolean",
+            "description": "Salable status. Absent when availability export is disabled — absent is not the same as false."
+        },
+        "image": {
+            "type": "string",
+            "format": "uri",
+            "description": "Absolute URL of the product base image (original file, not a resized cache variant)."
+        },
+        "attributes": {
+            "type": "object",
+            "description": "Merchant-configured attributes, keyed by attribute code, values resolved to store-view labels. The manufacturer/brand attribute is re-keyed to 'brand'.",
+            "additionalProperties": { "type": "string" }
+        },
         "short_description": { "type": "string" },
         "description": { "type": "string" },
         "content":     { "type": "string" },

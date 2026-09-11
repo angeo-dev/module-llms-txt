@@ -17,6 +17,11 @@ namespace Angeo\LlmsTxt\Api\Data;
  * Textual content (getContent / getShortContent) is ALREADY sanitized at the
  * maximum length any format needs; renderers only truncate down.
  *
+ * 4.0.0 added isInStock(), getImageUrl() and getAttributes(). Implementations
+ * outside this module must add them; {@see \Angeo\LlmsTxt\Model\Data\EntityRecord}
+ * takes them as optional trailing constructor arguments, so existing
+ * instantiations keep compiling.
+ *
  * @api
  * @since 3.2.0
  */
@@ -54,4 +59,28 @@ interface EntityRecordInterface
 
     /** Resolved store summary line (store record only). */
     public function getSummary(): ?string;
+
+    /**
+     * Whether the product is salable in this store. Null when the record is
+     * not a product, or when availability export is switched off.
+     *
+     * @since 4.0.0
+     */
+    public function isInStock(): ?bool;
+
+    /**
+     * Absolute URL of the product's base image, or null.
+     *
+     * @since 4.0.0
+     */
+    public function getImageUrl(): ?string;
+
+    /**
+     * Extra exported attributes, keyed by attribute code, values already
+     * resolved to store-view labels. Empty when nothing is configured.
+     *
+     * @return array<string, string>
+     * @since 4.0.0
+     */
+    public function getAttributes(): array;
 }

@@ -81,7 +81,8 @@ class MdMirror implements ActionInterface, HttpGetActionInterface
         private readonly OutputContextFactory $contextFactory,
         private readonly CacheInterface $cache,
         private readonly LoggerInterface $logger,
-        ?\Angeo\LlmsTxt\Model\Output\Signature $signature = null
+        ?\Angeo\LlmsTxt\Model\Output\Signature $signature = null,
+        private readonly ?\Angeo\LlmsTxt\Model\Cache\MdMirrorCacheKey $mdCacheKey = null
     ) {
         $this->signature = $signature ?? new \Angeo\LlmsTxt\Model\Output\Signature();
     }
@@ -122,7 +123,7 @@ class MdMirror implements ActionInterface, HttpGetActionInterface
                 if ($cached === self::NOT_FOUND_SENTINEL) {
                     return $this->notFound();
                 }
-                return $this->buildResult($cached);
+                return $this->buildResult($cached, $store);
             }
 
             $rewrite = $this->urlFinder->findOneByData([
@@ -170,7 +171,7 @@ class MdMirror implements ActionInterface, HttpGetActionInterface
                 $this->config->getHttpCacheTtl()
             );
 
-            return $this->buildResult($markdown);
+            return $this->buildResult($markdown, $store);
         } catch (\Throwable $e) {
             $this->logger->error('[Angeo LlmsTxt] MdMirror error: ' . $e->getMessage(), [
                 'exception' => $e,
@@ -179,10 +180,20 @@ class MdMirror implements ActionInterface, HttpGetActionInterface
         }
     }
 
-    private function buildResult(string $markdown): Raw
+    private function buildResult(string $markdown, ?\Magento\Store\Api\Data\StoreInterface $store = null): Raw
     {
         $result = $this->resultRawFactory->create();
         $result->setHeader('Content-Type', 'text/markdown; charset=utf-8', true);
+        // llms.txt v2: the Link: header form works for non-HTML resources, so
+        // an agent that fetched the mirror directly can still find the
+        // llms.txt covering it without going back to the HTML page.
+        if ($store !== null && $this->config->isLinkRelationsEnabled($store)) {
+            $result->setHeader(
+                'Link',
+                sprintf('<%s/llms.txt>; rel="describedby"', rtrim($store->getBaseUrl(), '/')),
+                true
+            );
+        }
         $result->setHeader('Content-Length', (string) strlen($markdown), true);
         $result->setHeader('Cache-Control', sprintf(
             'public, max-age=%d',
@@ -196,7 +207,10 @@ class MdMirror implements ActionInterface, HttpGetActionInterface
 
     private function buildCacheKey(int $storeId, string $requestPath): string
     {
-        return 'angeo_llms_md_' . $storeId . '_' . hash('sha256', $requestPath);
+        // 4.1.0: the rule lives in MdMirrorCacheKey so the save observer can
+        // compute the same key. Kept nullable for BC with manual instantiation.
+        return ($this->mdCacheKey ?? new \Angeo\LlmsTxt\Model\Cache\MdMirrorCacheKey())
+            ->forPath($storeId, $requestPath);
     }
 
     private function rememberNotFound(string $cacheKey): void

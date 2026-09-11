@@ -18,7 +18,7 @@ use Psr\Log\LoggerInterface;
  * Schedule comes from the admin config (`angeo_llms/cron/schedule`); default is
  * daily at 02:00 server time.
  *
- * Frontend emulation, locking, atomic writes are all handled by AbstractGenerator;
+ * Frontend emulation, locking and atomic writes are handled by the pipeline;
  * this class is just the cron shim.
  *
  * @since 3.0.0

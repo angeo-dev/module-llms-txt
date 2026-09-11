@@ -52,7 +52,8 @@ class AgentsMdGenerator
         private readonly Signature $signature,
         private readonly GenerationStatusRepositoryInterface $statusRepository,
         private readonly ScopeConfigInterface $scopeConfig,
-        private readonly LoggerInterface $logger
+        private readonly LoggerInterface $logger,
+        private readonly ?\Angeo\LlmsTxt\Model\Output\SitemapUrlResolver $sitemapUrlResolver = null
     ) {
     }
 
@@ -167,9 +168,36 @@ class AgentsMdGenerator
                 $storeId
             ),
             'search_url_template' => rtrim($baseUrl, '/') . '/catalogsearch/result/?q={query}',
-            'sitemap_url' => '', // resolved from sitemap config in a follow-up; empty hides the line
+            'sitemap_url' => $this->sitemapUrlResolver !== null
+                ? $this->sitemapUrlResolver->forStore($store, $baseUrl)
+                : '',
+            'agentic_sitemap_url' => $this->config->isAgenticSitemapEnabled($store)
+                ? rtrim($baseUrl, '/') . '/sitemap_agentic_discovery.xml'
+                : '',
+            'pages'      => $this->resolvePages($store, $baseUrl),
             'surfaces'   => $this->surfaceRegistry->forStore($store),
         ];
+    }
+
+    /**
+     * Policy / company links for agents.md. Config values are either absolute
+     * URLs or paths relative to the store base URL (a CMS identifier such as
+     * `shipping-policy` is exactly such a path), so merchants can point at a
+     * CMS page without knowing its rewrite.
+     *
+     * @return array<string, string> label => absolute URL
+     * @since 4.0.0
+     */
+    private function resolvePages(StoreInterface $store, string $baseUrl): array
+    {
+        $out = [];
+        foreach ($this->config->getAgentsPageLinks($store) as $label => $value) {
+            $out[$label] = preg_match('~^https?://~i', $value) === 1
+                ? $value
+                : rtrim($baseUrl, '/') . '/' . ltrim($value, '/');
+        }
+
+        return $out;
     }
 
     private function deleteIfExists(

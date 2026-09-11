@@ -8,6 +8,7 @@ declare(strict_types=1);
 
 namespace Angeo\LlmsTxt\Controller;
 
+use Angeo\LlmsTxt\Controller\Index\AgenticSitemap as AgenticSitemapController;
 use Angeo\LlmsTxt\Controller\Index\Index as IndexController;
 use Angeo\LlmsTxt\Controller\Index\MdMirror as MdMirrorController;
 use Angeo\LlmsTxt\Model\Config;
@@ -26,6 +27,7 @@ use Psr\Log\LoggerInterface;
  *   /llms.jsonl      → Index controller, file=llms.jsonl
  *   /llms-full.jsonl → Index controller, file=llms-full.jsonl (alias of .jsonl)
  *   /agents.md       → Index controller, file=agents.md (since 3.4.0)
+ *   /sitemap_agentic_discovery.xml → AgenticSitemap controller (since 4.0.0)
  *   /{path}.md       → MdMirror controller (when md_mirror is enabled)
  *
  * Multi-store: Magento's store-resolution (path-based or code-based) has already
@@ -46,6 +48,9 @@ class Router implements RouterInterface
 {
     public const PARAM_FILE = 'llms_file';
     public const PARAM_MD_PATH = 'md_path';
+
+    /** @since 4.0.0 */
+    private const AGENTIC_SITEMAP = 'sitemap_agentic_discovery.xml';
 
     private const FILE_ROUTES = [
         'llms.txt'        => true,
@@ -73,6 +78,16 @@ class Router implements RouterInterface
         // Last segment is the filename — handles /llms.txt and /storepath/llms.txt.
         $lastSlash = strrpos($path, '/');
         $tail = $lastSlash === false ? $path : substr($path, $lastSlash + 1);
+
+        if ($tail === self::AGENTIC_SITEMAP) {
+            $request
+                ->setModuleName('llms')
+                ->setControllerName('index')
+                ->setActionName('agenticsitemap')
+                ->setDispatched(true);
+
+            return $this->actionFactory->create(AgenticSitemapController::class);
+        }
 
         if (isset(self::FILE_ROUTES[$tail])) {
             $request

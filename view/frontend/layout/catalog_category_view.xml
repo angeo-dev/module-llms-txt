@@ -1,0 +1,26 @@
+<?xml version="1.0"?>
+<!--
+  ~ Angeo LLMs.txt — llms.txt v2 link relations in <head>.
+  ~
+  ~ head.additional is a BLOCK (declared at the bottom of
+  ~ Magento_Theme/view/frontend/layout/default.xml), not a container — see
+  ~ magento/magento2#16497. referenceContainer happens to resolve by name at
+  ~ runtime, but it logs in developer mode, so referenceBlock is used here.
+  ~
+  ~ Theme-independent by design: the block emits two <link> tags and nothing
+  ~ else — no JavaScript, no CSS, no x-magento-init. The same file therefore
+  ~ works unchanged in Luma and in Hyvä, which keeps head.additional as an
+  ~ extension point. No hyva_ layout variant is needed.
+  ~
+  ~ @license MIT
+  -->
+<page xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:noNamespaceSchemaLocation="urn:magento:framework:View/Layout/etc/page_configuration.xsd">
+    <body>
+        <referenceBlock name="head.additional">
+            <block class="Angeo\LlmsTxt\Block\Head\LinkRelations"
+                   name="angeo.llms.link.relations"
+                   template="Angeo_LlmsTxt::head/link_relations.phtml"/>
+        </referenceBlock>
+    </body>
+</page>

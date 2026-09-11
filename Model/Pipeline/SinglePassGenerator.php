@@ -12,7 +12,6 @@ use Angeo\LlmsTxt\Api\EntityProviderInterface;
 use Angeo\LlmsTxt\Api\FormatRendererInterface;
 use Angeo\LlmsTxt\Api\GenerationStatusRepositoryInterface;
 use Angeo\LlmsTxt\Api\OutputContextInterface;
-use Angeo\LlmsTxt\Api\ProviderInterface;
 use Angeo\LlmsTxt\Api\UrlResolverInterface;
 use Angeo\LlmsTxt\Model\Config;
 use Angeo\LlmsTxt\Model\Generator\GenerationSummary;
@@ -21,6 +20,7 @@ use Angeo\LlmsTxt\Model\Output\OutputContextFactory;
 use Angeo\LlmsTxt\Model\Output\AgentSurfacesBlock;
 use Angeo\LlmsTxt\Model\Output\Signature;
 use Angeo\LlmsTxt\Model\Output\SurfaceRegistry;
+use Angeo\LlmsTxt\Model\Pipeline\ChangeDetector;
 use Magento\Framework\App\Area;
 use Magento\Framework\App\Filesystem\DirectoryList;
 use Magento\Framework\Event\ManagerInterface as EventManagerInterface;
@@ -33,34 +33,23 @@ use Magento\Store\Model\StoreManagerInterface;
 use Psr\Log\LoggerInterface;
 
 /**
- * SINGLE-PASS generation pipeline (3.2.0, opt-in).
+ * The generation pipeline (single pass; the only pipeline since 4.0.0).
  *
  * For each eligible store the catalog is iterated EXACTLY ONCE:
- *  - frontend emulation is set up once (legacy: once per format),
- *  - the URL-rewrite map is read once (legacy: once per format),
- *  - every entity is loaded and sanitized once (legacy: per format),
+ *  - frontend emulation is set up once,
+ *  - the URL-rewrite map is read once,
+ *  - every entity is loaded and sanitized once,
  *  - each {@see EntityProviderInterface} record is rendered by every enabled
  *    {@see FormatRendererInterface} into its own atomically-written stream.
  *
- * Backward compatibility:
- *  - File names, on-disk layout, served URLs, status records, and the
- *    angeo_llms_generation_before/after/failed events (dispatched per format)
- *    are identical to the legacy pipeline.
- *  - Legacy {@see ProviderInterface} providers registered by third parties on
- *    the deprecated generators are executed in a supplemental compatibility
- *    pass and appended to the corresponding stream (see $legacyExtraProviders).
+ * File names, on-disk layout, served URLs, status records, and the
+ * angeo_llms_generation_before/after/failed events (dispatched per format)
+ * are unchanged from 3.x.
  *
  * @since 3.2.0
  */
 class SinglePassGenerator
 {
-    /** Verbosity used for legacy compatibility contexts, keyed by format. */
-    private const LEGACY_VERBOSITY = [
-        OutputContextInterface::FORMAT_LLMS_TXT      => OutputContextInterface::VERBOSITY_COMPACT,
-        OutputContextInterface::FORMAT_LLMS_FULL_TXT => OutputContextInterface::VERBOSITY_FULL,
-        OutputContextInterface::FORMAT_JSONL         => OutputContextInterface::VERBOSITY_DATASET,
-    ];
-
     /**
      * @param EntityProviderInterface[] $entityProviders ordered via di.xml
      * @param FormatRendererInterface[] $renderers keyed by FORMAT_* code via di.xml
@@ -81,32 +70,34 @@ class SinglePassGenerator
         private readonly array $renderers = [],
         ?Signature $signature = null,
         ?AgentSurfacesBlock $surfacesBlock = null,
-        ?SurfaceRegistry $surfaceRegistry = null
+        ?SurfaceRegistry $surfaceRegistry = null,
+        ?ChangeDetector $changeDetector = null
     ) {
+        // Kept nullable for manual instantiation in tests; di.xml always injects
+        // all three explicitly (Magento does not auto-wire optional params).
         $this->signature = $signature ?? new Signature();
-        $this->surfacesBlock = $surfacesBlock;
+        $this->surfacesBlock = $surfacesBlock ?? new AgentSurfacesBlock();
         $this->surfaceRegistry = $surfaceRegistry;
+        $this->changeDetector = $changeDetector;
     }
 
     /** @since 3.3.0 */
     private readonly Signature $signature;
-    /** @since 3.4.0 — nullable: absent only in exotic manual instantiation; DI always provides them. */
-    private readonly ?AgentSurfacesBlock $surfacesBlock;
+    /** @since 3.4.0 */
+    private readonly AgentSurfacesBlock $surfacesBlock;
     /** @since 3.4.0 */
     private readonly ?SurfaceRegistry $surfaceRegistry;
+    /** @since 4.1.0 */
+    private readonly ?ChangeDetector $changeDetector;
 
     /**
      * @param string|null $storeCode restrict to one store, or null for all
      * @param array<string, bool> $skip ['llms_txt' => true, ...]
-     * @param array<string, ProviderInterface[]> $legacyExtraProviders
-     *        third-party legacy providers to append, keyed by format
-     * @return array<string, GenerationSummary> keyed by format (legacy-shaped)
+     * @param bool $force Ignore the unchanged-since check and always rebuild.
+     * @return array<string, GenerationSummary> keyed by format
      */
-    public function generateAll(
-        ?string $storeCode = null,
-        array $skip = [],
-        array $legacyExtraProviders = []
-    ): array {
+    public function generateAll(?string $storeCode = null, array $skip = [], bool $force = false): array
+    {
         $summaries = [];
         foreach ($this->pathResolver->getFormats() as $format) {
             // agents.md is generated by its own standalone generator (store-level
@@ -132,7 +123,7 @@ class SinglePassGenerator
         $directory->create(FilePathResolver::SUB_DIR);
 
         foreach ($stores as $store) {
-            $this->processStore($store, $directory, $summaries, $legacyExtraProviders);
+            $this->processStore($store, $directory, $summaries, $force);
         }
 
         return $summaries;
@@ -140,13 +131,12 @@ class SinglePassGenerator
 
     /**
      * @param array<string, GenerationSummary> $summaries
-     * @param array<string, ProviderInterface[]> $legacyExtraProviders
      */
     private function processStore(
         StoreInterface $store,
         WriteInterface $directory,
         array $summaries,
-        array $legacyExtraProviders
+        bool $force = false
     ): void {
         $code = $store->getCode();
         $isActive = !method_exists($store, 'isActive') || $store->isActive();
@@ -163,6 +153,17 @@ class SinglePassGenerator
             }
         }
         if ($activeFormats === []) {
+            return;
+        }
+
+        if (!$force && $this->isUnchanged($store, $directory, $activeFormats)) {
+            foreach ($activeFormats as $format) {
+                $summaries[$format]->skip($code);
+            }
+            $this->logger->info(sprintf(
+                '[Angeo LlmsTxt] Nothing changed for store %s since the last run — skipped.',
+                $code
+            ));
             return;
         }
 
@@ -256,52 +257,15 @@ class SinglePassGenerator
             }
             unset($s);
 
-            // ── Legacy compatibility pass for third-party ProviderInterface ──
-            foreach ($streams as $format => &$s) {
-                $extras = $legacyExtraProviders[$format] ?? [];
-                if ($extras === []) {
-                    continue;
-                }
-                $legacyContext = $this->contextFactory->create(
-                    $store,
-                    $format,
-                    self::LEGACY_VERBOSITY[$format]
-                );
-                foreach ($extras as $legacyProvider) {
-                    if (!$legacyProvider instanceof ProviderInterface
-                        || !$legacyProvider->isApplicable($legacyContext)
-                    ) {
-                        continue;
-                    }
-                    try {
-                        foreach ($legacyProvider->provide($legacyContext) as $chunk) {
-                            if (!is_string($chunk) || $chunk === '') {
-                                continue;
-                            }
-                            $s['bytes'] += $s['stream']->write($chunk);
-                            $s['items']++;
-                        }
-                    } catch (\Throwable $e) {
-                        $this->logger->warning(sprintf(
-                            '[Angeo LlmsTxt] Legacy provider %s failed for store %s: %s',
-                            $legacyProvider::class,
-                            $code,
-                            $e->getMessage()
-                        ));
-                    }
-                }
-            }
-            unset($s);
-
             // ── Agent-discovery hub block + attribution signature — markdown
-            //    formats only, last chunks in the file (after legacy extras). ──
+            //    formats only, last chunks in the file. ──
             foreach ($streams as $format => &$s) {
                 if ($format === OutputContextInterface::FORMAT_JSONL || $s['bytes'] === 0) {
                     continue;
                 }
-                if ($format === OutputContextInterface::FORMAT_LLMS_TXT && $this->surfacesBlock !== null) {
+                if ($format === OutputContextInterface::FORMAT_LLMS_TXT) {
                     $block = $this->surfacesBlock->render(
-                        $s['context']->getBaseUrl(),
+                        $context->getBaseUrl(),
                         $this->surfaceRegistry !== null ? $this->surfaceRegistry->forStore($store) : []
                     );
                     if ($block !== '') {
@@ -378,6 +342,50 @@ class SinglePassGenerator
             }
             $this->urlResolver->reset();
         }
+    }
+
+    /**
+     * Whether a rebuild can be skipped: the feature is on, every active format
+     * already has a file on disk, and nothing relevant has changed since the
+     * OLDEST of their successful runs.
+     *
+     * The oldest is the right bound — if llms.txt ran an hour ago but JSONL
+     * failed yesterday, the store is not up to date.
+     *
+     * @param string[] $activeFormats
+     * @since 4.1.0
+     */
+    private function isUnchanged(StoreInterface $store, WriteInterface $directory, array $activeFormats): bool
+    {
+        if ($this->changeDetector === null || !$this->config->isSkipUnchangedEnabled($store)) {
+            return false;
+        }
+
+        $code = $store->getCode();
+        $oldestSuccess = null;
+
+        foreach ($activeFormats as $format) {
+            if (!$directory->isExist($this->pathResolver->getRelativePath($format, $code))) {
+                return false; // a missing file always rebuilds
+            }
+            $status = $this->statusRepository->get($code, $format);
+            $successAt = $status?->getLastSuccessAt();
+            if ($successAt === null) {
+                return false;
+            }
+            if ($oldestSuccess === null || $successAt < $oldestSuccess) {
+                $oldestSuccess = $successAt;
+            }
+        }
+
+        if ($oldestSuccess === null) {
+            return false;
+        }
+
+        $lastChange = $this->changeDetector->lastChangeAt($store);
+
+        // null means detection failed — regenerate rather than risk stale files.
+        return $lastChange !== null && $lastChange <= $oldestSuccess;
     }
 
     private function renderer(string $format): FormatRendererInterface

@@ -27,7 +27,10 @@ final class EntityRecord implements EntityRecordInterface
         private readonly ?string $sku = null,
         private readonly ?float $price = null,
         private readonly ?string $identifier = null,
-        private readonly ?string $summary = null
+        private readonly ?string $summary = null,
+        private readonly ?bool $inStock = null,
+        private readonly ?string $imageUrl = null,
+        private readonly array $attributes = []
     ) {
     }
 
@@ -79,5 +82,23 @@ final class EntityRecord implements EntityRecordInterface
     public function getSummary(): ?string
     {
         return $this->summary;
+    }
+
+    public function isInStock(): ?bool
+    {
+        return $this->inStock;
+    }
+
+    public function getImageUrl(): ?string
+    {
+        return $this->imageUrl;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function getAttributes(): array
+    {
+        return $this->attributes;
     }
 }

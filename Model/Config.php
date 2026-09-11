@@ -31,7 +31,7 @@ class Config
      *
      * @since 3.3.0
      */
-    public const MODULE_VERSION = '3.4.0';
+    public const MODULE_VERSION = '4.3.0';
 
     // ─── General ───────────────────────────────────────────────────────────
     public const XML_PATH_ENABLED            = 'angeo_llms/general/enabled';
@@ -55,6 +55,24 @@ class Config
     public const XML_PATH_GENERATE_JSONL     = 'angeo_llms/formats/generate_jsonl';
     public const XML_PATH_GENERATE_MD_MIRROR = 'angeo_llms/formats/generate_md_mirror';
     public const XML_PATH_GENERATE_AGENTS_MD = 'angeo_llms/formats/generate_agents_md';
+    public const XML_PATH_LINK_RELATIONS     = 'angeo_llms/formats/emit_link_relations';
+    public const XML_PATH_LINK_TO_MD         = 'angeo_llms/formats/link_to_md';
+    public const XML_PATH_AGENTIC_SITEMAP    = 'angeo_llms/formats/generate_agentic_sitemap';
+
+    // ─── Product data (4.0.0) ──────────────────────────────────────────────
+    public const XML_PATH_PD_ATTRIBUTES      = 'angeo_llms/product_data/export_attributes';
+    public const XML_PATH_PD_AVAILABILITY    = 'angeo_llms/product_data/include_availability';
+    public const XML_PATH_PD_IMAGE           = 'angeo_llms/product_data/include_image';
+    public const XML_PATH_PD_BRAND           = 'angeo_llms/product_data/brand_attribute';
+    public const XML_PATH_PD_STOCK_SOURCE    = 'angeo_llms/product_data/stock_source';
+
+    // ─── agents.md (4.0.0) ─────────────────────────────────────────────────
+    public const XML_PATH_AGENTS_SHIPPING    = 'angeo_llms/agents/page_shipping';
+    public const XML_PATH_AGENTS_RETURNS     = 'angeo_llms/agents/page_returns';
+    public const XML_PATH_AGENTS_PRIVACY     = 'angeo_llms/agents/page_privacy';
+    public const XML_PATH_AGENTS_TERMS       = 'angeo_llms/agents/page_terms';
+    public const XML_PATH_AGENTS_ABOUT       = 'angeo_llms/agents/page_about';
+    public const XML_PATH_AGENTS_SUPPORT     = 'angeo_llms/agents/support_url';
 
     // ─── Sanitizer ─────────────────────────────────────────────────────────
     public const XML_PATH_RESOLVE_DIRECTIVES = 'angeo_llms/sanitizer/resolve_directives';
@@ -65,18 +83,8 @@ class Config
 
     // ─── Performance ───────────────────────────────────────────────────────
     public const XML_PATH_PAGE_SIZE          = 'angeo_llms/performance/collection_page_size';
-    public const XML_PATH_GENERATION_MODE    = 'angeo_llms/performance/generation_mode';
-
-    /**
-     * Generation pipeline modes (3.2.0).
-     *
-     * LEGACY      — three independent generators, one catalog pass per format
-     *               (pre-3.2 behavior; default). DEPRECATED: will be removed
-     *               in 4.0.0, when single-pass becomes the only pipeline.
-     * SINGLE_PASS — one catalog pass per store renders all enabled formats.
-     */
-    public const MODE_LEGACY      = 'legacy';
-    public const MODE_SINGLE_PASS = 'single_pass';
+    public const XML_PATH_SKIP_UNCHANGED     = 'angeo_llms/performance/skip_unchanged';
+    public const XML_PATH_INVALIDATE_ON_SAVE = 'angeo_llms/performance/invalidate_mirror_on_save';
 
     // ─── HTTP ──────────────────────────────────────────────────────────────
     public const XML_PATH_CACHE_TTL          = 'angeo_llms/http/cache_ttl_seconds';
@@ -182,7 +190,12 @@ class Config
     }
 
     /**
-     * Whether the ## Products section should be placed under ## Optional (spec compliance).
+     * Whether the products section is nested under `## Optional`.
+     *
+     * 4.0.0 defaults this to NO. llms.txt v2 (August 2026) removed the
+     * mechanical meaning of `## Optional`: it no longer tells any tool what to
+     * drop, it is just a convention for secondary links. Products are the
+     * primary content of a store, so they belong in a section of their own.
      */
     public function areProductsUnderOptional(StoreInterface $store): bool
     {
@@ -369,23 +382,187 @@ class Config
     }
 
     /**
-     * Active generation pipeline. Global scope — mixing modes per store would
-     * make concurrent runs fight over the same output files.
+     * Emit llms.txt v2 link relations (`rel="alternate" type="text/markdown"`
+     * and `rel="describedby"`) in the storefront <head> and as HTTP `Link:`
+     * headers on the markdown mirrors.
      *
-     * @since 3.2.0
+     * @since 4.0.0
      */
-    public function getGenerationMode(): string
+    public function isLinkRelationsEnabled(StoreInterface $store): bool
     {
-        $mode = (string) $this->scopeConfig->getValue(self::XML_PATH_GENERATION_MODE);
-        return $mode === self::MODE_SINGLE_PASS ? self::MODE_SINGLE_PASS : self::MODE_LEGACY;
+        return $this->scopeConfig->isSetFlag(
+            self::XML_PATH_LINK_RELATIONS,
+            ScopeInterface::SCOPE_STORE,
+            $store->getId()
+        );
     }
 
     /**
-     * @since 3.2.0
+     * Whether entity links inside llms.txt / llms-full.txt point at the
+     * markdown mirror instead of the HTML page. llms.txt v2 asks for links to
+     * LLM-friendly content; only meaningful when mirrors are served.
+     *
+     * @since 4.0.0
      */
-    public function isSinglePassEnabled(): bool
+    public function isLinkToMdEnabled(StoreInterface $store): bool
     {
-        return $this->getGenerationMode() === self::MODE_SINGLE_PASS;
+        return $this->isMdMirrorEnabled($store)
+            && $this->scopeConfig->isSetFlag(
+                self::XML_PATH_LINK_TO_MD,
+                ScopeInterface::SCOPE_STORE,
+                $store->getId()
+            );
+    }
+
+    /**
+     * Serve /sitemap_agentic_discovery.xml — a small sitemap whose only job is
+     * to declare agents.md and llms.txt so agents do not have to guess.
+     *
+     * @since 4.0.0
+     */
+    public function isAgenticSitemapEnabled(StoreInterface $store): bool
+    {
+        return $this->scopeConfig->isSetFlag(
+            self::XML_PATH_AGENTIC_SITEMAP,
+            ScopeInterface::SCOPE_STORE,
+            $store->getId()
+        );
+    }
+
+    /**
+     * Extra product attribute codes exported to llms-full.txt and JSONL.
+     *
+     * @return string[]
+     * @since 4.0.0
+     */
+    public function getExportAttributes(StoreInterface $store): array
+    {
+        $codes = $this->parseCsv((string) $this->scopeConfig->getValue(
+            self::XML_PATH_PD_ATTRIBUTES,
+            ScopeInterface::SCOPE_STORE,
+            $store->getId()
+        ));
+
+        $brand = $this->getBrandAttribute($store);
+        if ($brand !== '' && !in_array($brand, $codes, true)) {
+            $codes[] = $brand;
+        }
+
+        return $codes;
+    }
+
+    /** @since 4.0.0 */
+    public function isAvailabilityIncluded(StoreInterface $store): bool
+    {
+        return $this->scopeConfig->isSetFlag(
+            self::XML_PATH_PD_AVAILABILITY,
+            ScopeInterface::SCOPE_STORE,
+            $store->getId()
+        );
+    }
+
+    /** @since 4.0.0 */
+    public function isImageIncluded(StoreInterface $store): bool
+    {
+        return $this->scopeConfig->isSetFlag(
+            self::XML_PATH_PD_IMAGE,
+            ScopeInterface::SCOPE_STORE,
+            $store->getId()
+        );
+    }
+
+    /**
+     * Where salable status is read from: `auto` (MSI when installed, legacy
+     * otherwise) or `legacy`.
+     *
+     * @since 4.2.0
+     */
+    public function getStockSource(StoreInterface $store): string
+    {
+        $value = (string) $this->scopeConfig->getValue(
+            self::XML_PATH_PD_STOCK_SOURCE,
+            ScopeInterface::SCOPE_STORE,
+            $store->getId()
+        );
+
+        return $value !== '' ? $value : 'auto';
+    }
+
+    /** @since 4.0.0 */
+    public function getBrandAttribute(StoreInterface $store): string
+    {
+        return trim((string) $this->scopeConfig->getValue(
+            self::XML_PATH_PD_BRAND,
+            ScopeInterface::SCOPE_STORE,
+            $store->getId()
+        ));
+    }
+
+    /**
+     * Policy / company links surfaced in agents.md. Each value is either an
+     * absolute URL or a path relative to the store base URL (a CMS page
+     * identifier such as `shipping-policy` works as-is).
+     *
+     * @return array<string, string>  label => raw configured value
+     * @since 4.0.0
+     */
+    public function getAgentsPageLinks(StoreInterface $store): array
+    {
+        $map = [
+            'Delivery' => self::XML_PATH_AGENTS_SHIPPING,
+            'Returns'  => self::XML_PATH_AGENTS_RETURNS,
+            'Privacy'  => self::XML_PATH_AGENTS_PRIVACY,
+            'Terms'    => self::XML_PATH_AGENTS_TERMS,
+            'About'    => self::XML_PATH_AGENTS_ABOUT,
+            'Support'  => self::XML_PATH_AGENTS_SUPPORT,
+        ];
+
+        $links = [];
+        foreach ($map as $label => $path) {
+            $value = trim((string) $this->scopeConfig->getValue(
+                $path,
+                ScopeInterface::SCOPE_STORE,
+                $store->getId()
+            ));
+            if ($value !== '') {
+                $links[$label] = $value;
+            }
+        }
+
+        return $links;
+    }
+
+    /**
+     * Skip a store's catalog pass when nothing relevant changed since its last
+     * successful run.
+     *
+     * Off by default, and that is deliberate: detection reads entity
+     * timestamps, which stock movements and catalog price rules do not touch.
+     * See {@see \Angeo\LlmsTxt\Model\Pipeline\ChangeDetector}.
+     *
+     * @since 4.1.0
+     */
+    public function isSkipUnchangedEnabled(StoreInterface $store): bool
+    {
+        return $this->scopeConfig->isSetFlag(
+            self::XML_PATH_SKIP_UNCHANGED,
+            ScopeInterface::SCOPE_STORE,
+            $store->getId()
+        );
+    }
+
+    /**
+     * Drop an entity's cached markdown mirror when it is saved or deleted.
+     *
+     * @since 4.1.0
+     */
+    public function isInvalidateMirrorOnSaveEnabled(StoreInterface $store): bool
+    {
+        return $this->scopeConfig->isSetFlag(
+            self::XML_PATH_INVALIDATE_ON_SAVE,
+            ScopeInterface::SCOPE_STORE,
+            $store->getId()
+        );
     }
 
     public function getHttpCacheTtl(): int

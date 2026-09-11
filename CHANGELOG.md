@@ -7,6 +7,323 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [4.3.0] — 2026-09-08
+
+Loose ends. Three defects that were known and carried, plus the integration
+tests. No breaking changes, no new configuration.
+
+### Fixed
+
+* **Empty blockquote in llms.txt and llms-full.txt.** A store with no meta
+  description and no Custom Summary produced a bare `> ` line. That is worse
+  than having no summary: to a parser it looks like the spec's summary and
+  carries nothing. The line is now omitted when the summary is empty, and
+  `angeo:llms:validate` reports a bare `> ` as an error instead of counting it
+  as a valid summary — which it had been doing since 4.0.0.
+* **The `Sitemap:` line in agents.md never appeared.** It was hardcoded empty
+  in 3.4.0 with a "resolved in a follow-up" comment. `SitemapUrlResolver` now
+  reads the store's most recently generated sitemap and builds the URL. Reads
+  the `sitemap` table directly rather than depending on Magento_Sitemap's
+  classes: that module is removable, and a missing sitemap should omit a line,
+  not fail generation.
+* Removed `Model\Config\Source\PageBuilderContentType`, which nothing
+  referenced — not `system.xml`, not `di.xml`, not any PHP file. It had been
+  dead since the sanitizer was reworked.
+
+### Added
+
+* Integration tests for the router: that `/llms.txt` and
+  `/sitemap_agentic_discovery.xml` are claimed rather than falling through to
+  the CMS no-route handler, and that with the module disabled `/llms.txt`
+  returns a plain 404 so a merchant can serve their own file from the web root.
+
+  These need the Magento integration test framework and a test database. They
+  are **not** in `phpunit.xml` and **not** in the GitHub Actions workflow,
+  which runs without a Magento installation. See `Test/Integration/README.md`.
+
+### Notes
+
+* One planned item is deliberately not here. Referencing `llms.txt` and
+  `agents.md` from `robots.txt` belongs in `angeo/module-robots-txt-aeo`, which
+  owns that file and already does lossless RFC 9309 round-trip parsing. Writing
+  robots.txt from two modules is how merchants end up with duplicated
+  directives.
+
+---
+
+## [4.2.0] — 2026-09-07
+
+Correctness release for one specific case: stores running more than one stock.
+No breaking changes.
+
+### Added
+
+* **`Availability Source`** (`Product Data`, default **Auto**). Salable status
+  is read through Multi-Source Inventory when MSI is installed, and through the
+  legacy stock index otherwise. `Legacy` forces the old index.
+* `Model\Stock\SalableStatusResolver`.
+
+### Fixed
+
+* **Availability could be wrong on multi-stock stores.** 4.0.0 started
+  publishing salable status as a fact that an AI agent reads and repeats to a
+  shopper, but it read that fact from `cataloginventory_stock_status`, which is
+  not the source of truth for a sales channel once a store has more than one
+  stock. Until 4.0.0 the same index was used only to *filter* out-of-stock
+  products, where a wrong answer merely meant a product appeared or did not.
+  Publishing "in stock" wrongly is worse.
+
+  Single-source merchants — Default Source with Default Stock, which is most of
+  them — are unaffected either way: MSI keeps the legacy index in sync for the
+  default stock, so both paths give the same answer.
+
+### Notes
+
+* The MSI lookup is batched per collection page
+  (`AreProductsSalableInterface::execute()`), never one call per product.
+* If MSI is asked and cannot answer, the module logs it and falls back to the
+  legacy index rather than publishing a guess. A SKU missing from a
+  *successful* MSI batch is treated as not salable, which is what it means.
+* MSI is optional. Adobe Commerce and Mage-OS both allow the `Magento_Inventory*`
+  modules to be removed, so the dependency is resolved lazily inside
+  `SalableStatusResolver` and nowhere else — type-hinting the interface in a
+  constructor would break `setup:di:compile` on a store without MSI. Declared
+  in composer `suggest`, not `require`.
+* The out-of-stock *filter* still goes through the legacy stock helper, which
+  MSI plugs into. Verify on a multi-stock store that filtering and export agree.
+
+---
+
+## [4.1.0] — 2026-09-07
+
+Operational release. No breaking changes, no output-format changes — a 4.0.0
+install can take this without touching configuration.
+
+### Added
+
+* **`Skip Generation When Nothing Changed`** (`Performance`, default **No**).
+  When enabled, the nightly run skips a store whose products, categories, CMS
+  pages and module configuration all pre-date its last successful generation —
+  no catalog pass at all. The check is four `MAX()` reads on indexed timestamp
+  columns.
+
+  It is **off by default and that is deliberate.** Detection reads entity
+  timestamps, so it does not see stock movements (`cataloginventory_stock_item`
+  has no timestamp column) or prices changed by catalog price rules and
+  scheduled updates. Since 4.0.0 exports availability, a store with moving
+  stock would publish stale data. Turn it on only if your catalog changes by
+  product saves. If detection fails for any reason, the store is regenerated.
+* **`bin/magento angeo:llms:generate --force`** — rebuild regardless.
+* **`Invalidate Markdown Mirror on Save`** (`Performance`, default **Yes**).
+  Saving or deleting a product, category or CMS page now drops that entity's
+  cached `.md` mirror, the way Magento invalidates the cached HTML page.
+  Before this, an edited page kept serving its previous markdown until the
+  HTTP TTL expired — an hour by default, longer if the merchant raised it.
+  Only the affected entity's keys are removed, never the whole tag, so an
+  import does not throw away the entire mirror cache.
+* **`bin/magento angeo:llms:clean [--store=…] [--force]`** — deletes the
+  generated files and flushes the mirror cache. For when a format is switched
+  off and its stale file is still being served, and for removing the module's
+  output before uninstalling. Asks for confirmation unless `--force`.
+* `Model\Cache\MdMirrorCacheKey` — the mirror cache key rule, extracted so the
+  controller that fills the cache and the observer that invalidates it cannot
+  drift apart. Unit-tested.
+* `Model\Pipeline\ChangeDetector`.
+
+### Changed
+
+* `SinglePassGenerator::generateAll()` and `GenerationService::generateAll()`
+  take a third optional `bool $force` argument. Existing calls are unaffected.
+* `Controller\Index\MdMirror` takes an optional trailing `MdMirrorCacheKey`.
+
+### Not in this release, and why
+
+The roadmap called this "incremental generation", implying only changed
+products would be rewritten. That is not achievable for these formats and the
+wording was wrong. `llms.txt`, `llms-full.txt` and `llms.jsonl` are each a
+single ordered file per store, streamed and atomically renamed; rewriting one
+product inside one means rewriting the file, which means reading the catalog
+again. A per-entity delta would require splitting the output into fragments and
+concatenating them, which changes the on-disk contract and the served bytes for
+no gain a merchant can observe.
+
+What actually costs time is running the pass at all on a store that did not
+change — and that is what this release removes. On stores that do change every
+night, the pass still runs in full, and the honest lever there remains
+`Collection Page Size` and the cron schedule.
+
+---
+
+## [4.0.0] — 2026-09-07
+
+Two things happen in this release. The deprecations announced in 3.2.0 are
+carried out, and the module is brought in line with **llms.txt v2**
+(llmstxt.org, 10 August 2026). **Read the upgrade notes before deploying.**
+
+### Removed — BREAKING
+
+* **The legacy generation pipeline.** Single pass is now the only pipeline.
+  Deleted: `Api\ProviderInterface`, `Model\Provider\AbstractProvider`, the
+  eight bundled providers under `Model\Provider\Llms\*` and
+  `Model\Provider\Jsonl\*`, `Model\Generator\AbstractGenerator`,
+  `LlmsTxtGenerator`, `LlmsFullTxtGenerator`, `JsonlGenerator`, and
+  `Model\Config\Source\GenerationMode`.
+* **`Performance → Generation Pipeline`** (`angeo_llms/performance/generation_mode`)
+  and `Config::getGenerationMode()` / `isSinglePassEnabled()` /
+  `MODE_LEGACY` / `MODE_SINGLE_PASS`. A data patch deletes the stored rows.
+* **The compatibility pass for legacy providers.** A third-party module still
+  registering a `ProviderInterface` implementation on one of the deleted
+  generators will now fail at `setup:di:compile` with the missing class name.
+  Migrate to `Api\EntityProviderInterface` — see the README.
+* PHP 8.1 support. The floor is now 8.2, matching Magento 2.4.7+.
+
+### Added — llms.txt v2
+
+* **Link relations** (`Formats → Emit Link Relations`, default **Yes**).
+  v2's headline addition: given a page, an agent should be able to find its
+  markdown version and the llms.txt that covers it without guessing.
+  - `<link rel="alternate" type="text/markdown">` and
+    `<link rel="describedby">` in the `<head>` of product, category and CMS
+    pages, via a template block you can override in a theme;
+  - the same `rel="describedby"` as an HTTP `Link:` header on the served
+    markdown mirrors, so the relation also survives for non-HTML resources.
+  Requires markdown mirrors to be switched on.
+* **Links inside llms.txt point at markdown mirrors**
+  (`Formats → Link to Markdown Mirrors in llms.txt`, default **Yes** when
+  mirrors are on). v2 asks that llms.txt links lead to LLM-friendly content.
+  JSONL keeps the canonical `url` untouched and adds `md_url` beside it —
+  replacing `url` would break every consumer already indexing the feed.
+* **Both markdown URL forms are supported and documented.** v1 specified
+  `page.html.md`; v2 also allows `page.md`. The mirror controller resolves
+  either against `url_rewrite`, with or without the store's URL suffix.
+* **`angeo:llms:validate` rewritten to the v2 rules**, with `--strict` for CI.
+  It now checks that no heading sits between the summary and the first H2
+  (v2: "sections of any type except headings"), that every section list item
+  is a real markdown link, that links are absolute, and it warns when links
+  point at HTML while mirrors are being served. Reads go through Magento's
+  Filesystem abstraction, so it works on Adobe Commerce Cloud.
+
+### Changed — BREAKING
+
+* **`Products under "## Optional"` now defaults to No.** v2 removed the
+  mechanical meaning of `## Optional`: it no longer instructs any tool to drop
+  those links, it is only a convention for secondary content. Products are a
+  store's primary content. Existing installs that saved an explicit value keep
+  it; installs relying on the default will see products move from
+  `## Optional → ### Products` to a top-level `## Products`.
+* **`Api\Data\EntityRecordInterface` gained `isInStock()`, `getImageUrl()` and
+  `getAttributes()`.** Implementations outside this module must add them.
+  `Model\Data\EntityRecord` takes the three as optional trailing constructor
+  arguments, so existing instantiations keep working.
+* **JSONL schema is now 4.0.0** (`etc/jsonl-schema.json`) with `md_url`,
+  `in_stock`, `image` and `attributes`. All four are omitted when not
+  exported, so a consumer can tell "not exported" from "false" or "empty".
+
+### Added — product data for agents
+
+* **`Product Data` config group.** Availability (default Yes), base image URL
+  (default Yes), a brand attribute code, and a free list of extra attribute
+  codes. Availability and price are the two facts an AI shopping agent needs
+  before it recommends anything; the module previously exported only price.
+* Stock status is loaded in **batch per collection page**
+  (`Stock::addStockStatusToProducts`), never one round-trip per product.
+* Dropdown attributes are exported as their store-view labels, not option IDs.
+  The configured brand attribute is re-keyed to `brand` so agents do not have
+  to guess which attribute carries it. Empty values are dropped per product.
+
+### Added — agents.md and discovery
+
+* **`Agents.md Content` config group** — delivery, returns, privacy, terms,
+  about and support links. Each takes an absolute URL or a path relative to
+  the base URL, so a CMS identifier such as `shipping-policy` works as-is.
+  They render as a `## Key pages` section; the section is omitted entirely
+  when nothing is configured, so the file never carries an empty heading.
+  Labels and values go through the same prompt-injection hygiene as the rest
+  of agents.md.
+* **`/sitemap_agentic_discovery.xml`** (`Formats → Serve Agentic Discovery
+  Sitemap`, default **Yes**) — a small sitemap declaring only the agent-facing
+  files, mirroring what Shopify publishes. Lists only formats that are
+  actually enabled for the store: a sitemap pointing at a 404 is worse than
+  no sitemap. Submit it in Search Console next to the main sitemap.
+
+### Fixed
+
+* Carried over from 3.4.1: the single-pass hub block read the output context
+  from a stream-array key that was never written, which aborted generation for
+  every store whose llms.txt had content. See the 3.4.1 entry.
+
+### Compatibility
+
+* **Hyvä: natively compatible, nothing to install.** The new head block emits
+  two `<link>` tags and ships no JavaScript, CSS or LESS, so it renders
+  identically under Luma and Hyvä. The layout files attach to
+  `head.additional`, which Hyvä keeps as an extension point. No compatibility
+  module, no `hyva_` layout variant, no `hyva-themes.json` entry, no Tailwind
+  rebuild. Override `Angeo_LlmsTxt::head/link_relations.phtml` in a theme if
+  you want different markup.
+* The layout files use `referenceBlock` for `head.additional`. It is declared
+  as a block in `Magento_Theme`, not a container (magento/magento2#16497);
+  `referenceContainer` resolves by name at runtime but logs in developer mode.
+* Magento 2.4.7+ / PHP 8.2–8.5.
+
+### Added — tooling
+
+* GitHub Actions CI: lint, `Magento2` coding standard, PHPStan and PHPUnit on
+  PHP 8.2, 8.3, 8.4 and 8.5.
+* Unit tests for `MarkdownUrl` and for the new agents.md sections.
+
+### Upgrade notes
+
+1. **Before upgrading**, if you run any third-party module that extends the
+   generated files, check whether it implements `Angeo\LlmsTxt\Api\ProviderInterface`.
+   If it does, it must be migrated to `Api\EntityProviderInterface` first —
+   otherwise `setup:di:compile` will fail.
+2. `composer require angeo/module-llms-txt:^4.0`
+3. `bin/magento setup:upgrade && bin/magento setup:di:compile`
+4. `bin/magento cache:flush`. No frontend `static-content:deploy` is needed on
+   account of this release — the new template is a `.phtml`, which is not
+   static content.
+5. Review **Stores → Configuration → Angeo → LLMs.txt**: the new
+   *Product Data* and *Agents.md Content* groups, and the three new fields
+   under *Output Formats*.
+6. `bin/magento angeo:llms:generate` then `bin/magento angeo:llms:validate --strict`.
+7. Diff the regenerated files against your 3.4.x output. Expected differences:
+   products no longer nested under `## Optional`, links pointing at `.md`
+   mirrors when those are enabled, and availability on the product lines.
+
+---
+
+## [3.4.1] — 2026-09-07
+
+Hotfix. **Upgrade immediately if you run the single-pass pipeline.**
+
+### Fixed
+
+* **Single-pass generation aborted for every store whose llms.txt had
+  content.** `SinglePassGenerator` read the output context from a key that
+  was never written to the per-format stream array (`$s['context']`), so
+  rendering the 3.4.0 "For Agents & Developers" hub block raised an `Error`.
+  The error was swallowed by the pass-level `catch (\Throwable)`, which then
+  discarded **all** temporary streams for that store. Net effect with
+  `Performance → Generation Pipeline = Single pass`: llms.txt, llms-full.txt
+  and llms.jsonl were never written, the previous files kept being served
+  until they went stale, and the admin status panel showed a failure whose
+  message did not point at the cause.
+
+  Stores running the default `legacy` pipeline were **not** affected —
+  the legacy generators resolve the context separately.
+
+### Notes
+
+* No configuration, API, file-path or output-format changes. Drop-in upgrade
+  from 3.4.0: `composer require angeo/module-llms-txt:3.4.1`, then
+  `bin/magento setup:upgrade && bin/magento cache:flush` and re-run
+  `bin/magento angeo:llms:generate`.
+* 4.0.0 makes single-pass the only pipeline, so this fix is a prerequisite
+  for that release.
+
+---
+
 ## [3.4.0] — 2026-07-04
 
 agents.md release — storefront parity with the convention Shopify rolled out

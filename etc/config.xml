@@ -15,7 +15,9 @@
                 <include_categories>1</include_categories>
                 <include_cms>1</include_cms>
                 <include_products>1</include_products>
-                <products_under_optional>1</products_under_optional>
+                <!-- llms.txt v2 removed the mechanical meaning of ## Optional;
+                     products get their own section by default since 4.0.0. -->
+                <products_under_optional>0</products_under_optional>
                 <product_limit>5000</product_limit>
                 <exclude_out_of_stock>0</exclude_out_of_stock>
                 <cms_exclude_identifiers>no-route,enable-cookies,privacy-policy-cookie-restriction-mode</cms_exclude_identifiers>
@@ -27,7 +29,26 @@
                 <generate_jsonl>1</generate_jsonl>
                 <generate_agents_md>1</generate_agents_md>
                 <generate_md_mirror>0</generate_md_mirror>
+                <!-- llms.txt v2 (Aug 2026) discoverability + agentic sitemap. -->
+                <emit_link_relations>1</emit_link_relations>
+                <link_to_md>1</link_to_md>
+                <generate_agentic_sitemap>1</generate_agentic_sitemap>
             </formats>
+            <product_data>
+                <export_attributes></export_attributes>
+                <include_availability>1</include_availability>
+                <include_image>1</include_image>
+                <brand_attribute></brand_attribute>
+                <stock_source>auto</stock_source>
+            </product_data>
+            <agents>
+                <page_shipping></page_shipping>
+                <page_returns></page_returns>
+                <page_privacy></page_privacy>
+                <page_terms></page_terms>
+                <page_about></page_about>
+                <support_url></support_url>
+            </agents>
             <sanitizer>
                 <resolve_directives>1</resolve_directives>
                 <!-- SECURITY: default OFF — product content may originate from
@@ -39,9 +60,10 @@
             </sanitizer>
             <performance>
                 <collection_page_size>500</collection_page_size>
-                <!-- BC: default stays legacy in 3.2.x; single_pass becomes the
-                     only pipeline in 4.0.0. Opt in deliberately. -->
-                <generation_mode>legacy</generation_mode>
+                <!-- OFF by default: detection cannot see stock movements or
+                     catalog price rules. Opt in knowingly. -->
+                <skip_unchanged>0</skip_unchanged>
+                <invalidate_mirror_on_save>1</invalidate_mirror_on_save>
             </performance>
             <http>
                 <cache_ttl_seconds>3600</cache_ttl_seconds>

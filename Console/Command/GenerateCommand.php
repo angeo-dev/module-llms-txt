@@ -28,6 +28,8 @@ class GenerateCommand extends Command
     private const OPT_NO_JSONL = 'no-jsonl';
     private const OPT_NO_LLMS  = 'no-llms';
     private const OPT_NO_FULL  = 'no-full';
+    /** @since 4.1.0 */
+    private const OPT_FORCE    = 'force';
 
     public function __construct(
         private readonly GenerationService $generationService,
@@ -44,7 +46,8 @@ class GenerateCommand extends Command
             ->addOption(self::OPT_STORE,    's', InputOption::VALUE_OPTIONAL, 'Store code (default: all eligible stores)')
             ->addOption(self::OPT_NO_JSONL, null, InputOption::VALUE_NONE,    'Skip JSONL generation')
             ->addOption(self::OPT_NO_LLMS,  null, InputOption::VALUE_NONE,    'Skip llms.txt generation')
-            ->addOption(self::OPT_NO_FULL,  null, InputOption::VALUE_NONE,    'Skip llms-full.txt generation');
+            ->addOption(self::OPT_NO_FULL,  null, InputOption::VALUE_NONE,    'Skip llms-full.txt generation')
+            ->addOption(self::OPT_FORCE,    'f',  InputOption::VALUE_NONE,    'Rebuild even when nothing changed since the last run');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -74,7 +77,11 @@ class GenerateCommand extends Command
 
         $start = microtime(true);
         try {
-            $summaries = $this->generationService->generateAll($storeCode, $skip);
+            $summaries = $this->generationService->generateAll(
+                $storeCode,
+                $skip,
+                (bool) $input->getOption(self::OPT_FORCE)
+            );
         } catch (\Throwable $e) {
             $output->writeln('<error>FAILED: ' . $e->getMessage() . '</error>');
             return Command::FAILURE;

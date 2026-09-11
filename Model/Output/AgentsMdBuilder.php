@@ -19,7 +19,8 @@ namespace Angeo\LlmsTxt\Model\Output;
  *
  * Context keys (all optional except store_name/base_url):
  *   store_name, base_url, summary, locale, currency, contact_email,
- *   search_url_template, sitemap_url,
+ *   search_url_template, sitemap_url, agentic_sitemap_url,
+ *   pages: [label => absolute URL]  (4.0.0)
  *   surfaces: [llms_txt, llms_full_txt, jsonl, md_mirror, ucp, mcp] => bool
  *
  * @since 3.4.0
@@ -87,7 +88,34 @@ class AgentsMdBuilder
         if (!empty($ctx['sitemap_url'])) {
             $out[] = '- **Sitemap:** ' . $this->sanitizeInline((string) $ctx['sitemap_url']);
         }
+        if (!empty($ctx['agentic_sitemap_url'])) {
+            $out[] = '- **Agent discovery sitemap:** '
+                . $this->sanitizeInline((string) $ctx['agentic_sitemap_url'])
+                . ' — declares the files on this page.';
+        }
         $out[] = '';
+
+        // ── Key pages and policies ───────────────────────────────────────────
+        // An agent that is about to recommend or transact needs the delivery,
+        // returns and privacy terms as links it can quote, not as prose it has
+        // to find. Skipped entirely when the merchant configured nothing, so
+        // the file never carries an empty heading.
+        $pages = array_filter((array) ($ctx['pages'] ?? []));
+        if ($pages !== []) {
+            $out[] = '## Key pages';
+            $out[] = '';
+            foreach ($pages as $label => $url) {
+                $out[] = sprintf(
+                    '- **%s:** %s',
+                    $this->sanitizeInline((string) $label),
+                    $this->sanitizeInline((string) $url)
+                );
+            }
+            $out[] = '';
+            $out[] = 'These pages are authoritative for this store\'s terms. Quote them rather';
+            $out[] = 'than summarising from memory, and re-fetch them before stating a policy.';
+            $out[] = '';
+        }
 
         // ── How to search ────────────────────────────────────────────────────
         if (!empty($ctx['search_url_template'])) {

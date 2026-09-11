@@ -90,7 +90,7 @@
                        showInDefault="1" showInWebsite="1" showInStore="1">
                     <label>Products under "## Optional"</label>
                     <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
-                    <comment><![CDATA[Per llmstxt.org spec, links under <code>## Optional</code> can be dropped by AI clients under context-budget pressure. Strongly recommended for stores with many products.]]></comment>
+                    <comment><![CDATA[Default <strong>No</strong> since 4.0.0. llms.txt v2 (10 Aug 2026) removed the mechanical meaning of <code>## Optional</code> — it no longer instructs any tool to drop those links, it is only a convention for secondary content. Products are a store's primary content, so they get their own <code>## Products</code> section. Set to Yes only if you deliberately want them treated as secondary.]]></comment>
                     <depends>
                         <field id="include_products">1</field>
                     </depends>
@@ -171,6 +171,107 @@
                     <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
                     <comment><![CDATA[Serves an operator's manual for AI agents at <code>/agents.md</code> — interaction rules plus links to this store's machine-readable surfaces (llms.txt, UCP profile, MCP endpoint when the sibling Angeo modules are installed). Follows the storefront convention Shopify rolled out to all stores in May 2026. Also appends a "For Agents & Developers" section to llms.txt.]]></comment>
                 </field>
+
+                <field id="emit_link_relations" translate="label comment" type="select" sortOrder="50"
+                       showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Emit Link Relations</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment><![CDATA[llms.txt v2 discoverability. Adds <code>&lt;link rel="alternate" type="text/markdown"&gt;</code> and <code>&lt;link rel="describedby"&gt;</code> to the head of product, category and CMS pages, and sends the same pair as an HTTP <code>Link:</code> header on the served markdown mirrors. This is how an agent finds the markdown version of a page and the llms.txt that describes it without guessing. Requires <em>Serve /url-key.md Mirrors</em>.]]></comment>
+                    <depends>
+                        <field id="generate_md_mirror">1</field>
+                    </depends>
+                </field>
+
+                <field id="link_to_md" translate="label comment" type="select" sortOrder="55"
+                       showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Link to Markdown Mirrors in llms.txt</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment><![CDATA[llms.txt v2 asks that the links inside llms.txt point at LLM-friendly content. When yes, entity links in <code>llms.txt</code> and <code>llms-full.txt</code> use the <code>.md</code> mirror URL instead of the HTML page. Requires <em>Serve /url-key.md Mirrors</em>.]]></comment>
+                    <depends>
+                        <field id="generate_md_mirror">1</field>
+                    </depends>
+                </field>
+
+                <field id="generate_agentic_sitemap" translate="label comment" type="select" sortOrder="60"
+                       showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Serve Agentic Discovery Sitemap</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment><![CDATA[Serves <code>/sitemap_agentic_discovery.xml</code>, a small sitemap that declares only the agent-facing files (agents.md, llms.txt, and the other enabled formats). Submit it in Search Console next to your main sitemap. Mirrors what Shopify publishes.]]></comment>
+                </field>
+            </group>
+
+            <!-- ─── Product data (4.0.0) ─── -->
+            <group id="product_data" translate="label" sortOrder="35"
+                   showInDefault="1" showInWebsite="1" showInStore="1">
+                <label>Product Data</label>
+
+                <field id="include_availability" translate="label comment" type="select" sortOrder="10"
+                       showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Include Availability</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment><![CDATA[Exports the salable status of each product (<code>in_stock</code> in JSONL, <em>In stock / Out of stock</em> in the markdown formats). Availability is one of the two facts an AI shopping agent needs before it recommends a product; price is the other. Loaded in batch per collection page — no extra query per product.]]></comment>
+                </field>
+
+                <field id="include_image" translate="label comment" type="select" sortOrder="20"
+                       showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Include Image URL</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment><![CDATA[Exports the absolute URL of the product's base image (<code>image</code> in JSONL, an image line in llms-full.txt). The original file is linked, not a resized cache variant.]]></comment>
+                </field>
+
+                <field id="brand_attribute" translate="label comment" type="text" sortOrder="30"
+                       showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Brand Attribute Code</label>
+                    <comment><![CDATA[Attribute code holding the manufacturer or brand, e.g. <code>manufacturer</code>. Exported under the dedicated <code>brand</code> key so agents do not have to guess which attribute carries it. Leave empty if you have none.]]></comment>
+                </field>
+
+                <field id="stock_source" translate="label comment" type="select" sortOrder="15"
+                       showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Availability Source</label>
+                    <source_model>Angeo\LlmsTxt\Model\Config\Source\StockSource</source_model>
+                    <comment><![CDATA[<strong>Auto</strong> reads salable status through Multi-Source Inventory when MSI is installed, and through the legacy stock index otherwise. This matters only if you run more than one stock: for a single Default Source / Default Stock setup — the large majority — MSI keeps the legacy index in sync and both answers are identical. Choose <strong>Legacy</strong> to force the old index, for example if the MSI lookup is slow on a very large catalogue. If MSI is asked and cannot answer, the module falls back to the legacy index and logs it rather than publishing a guess.]]></comment>
+                    <depends>
+                        <field id="include_availability">1</field>
+                    </depends>
+                </field>
+
+                <field id="export_attributes" translate="label comment" type="textarea" sortOrder="40"
+                       showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Additional Attributes</label>
+                    <comment><![CDATA[Comma- or newline-separated attribute codes exported alongside the product, e.g. <code>color, size, material, gtin</code>. Dropdown values are exported as their store-view labels, not option IDs. Keep the list short: every code adds a column to each collection page. Empty values are omitted per product.]]></comment>
+                </field>
+            </group>
+
+            <!-- ─── agents.md content (4.0.0) ─── -->
+            <group id="agents" translate="label comment" sortOrder="37"
+                   showInDefault="1" showInWebsite="1" showInStore="1">
+                <label>Agents.md Content</label>
+                <comment><![CDATA[Links surfaced to AI agents in <code>/agents.md</code>. Each field takes either an absolute URL or a path relative to the store base URL — a CMS page identifier such as <code>shipping-policy</code> works as-is. Empty fields are skipped, no empty headings are produced.]]></comment>
+
+                <field id="page_shipping" translate="label" type="text" sortOrder="10"
+                       showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Delivery Page</label>
+                </field>
+                <field id="page_returns" translate="label" type="text" sortOrder="20"
+                       showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Returns Page</label>
+                </field>
+                <field id="page_privacy" translate="label" type="text" sortOrder="30"
+                       showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Privacy Page</label>
+                </field>
+                <field id="page_terms" translate="label" type="text" sortOrder="40"
+                       showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Terms Page</label>
+                </field>
+                <field id="page_about" translate="label" type="text" sortOrder="50"
+                       showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>About Page</label>
+                </field>
+                <field id="support_url" translate="label" type="text" sortOrder="60"
+                       showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Support / Contact Page</label>
+                </field>
             </group>
 
             <!-- ─── Sanitizer (Page Builder!) ─── -->
@@ -226,11 +327,18 @@
                    showInDefault="1" showInWebsite="0" showInStore="0">
                 <label>Performance</label>
 
-                <field id="generation_mode" translate="label comment" type="select" sortOrder="5"
-                       showInDefault="1" showInWebsite="0" showInStore="0">
-                    <label>Generation Pipeline</label>
-                    <source_model>Angeo\LlmsTxt\Model\Config\Source\GenerationMode</source_model>
-                    <comment><![CDATA[<strong>Single pass</strong> iterates the catalog once per store and renders every enabled format from that one pass (≈3× faster, one url_rewrite read, one sanitization per entity). Output files are identical to legacy. <strong>Legacy</strong> keeps the pre-3.2 per-format passes and is <em>deprecated — it will be removed in 4.0.0</em>. Custom providers built on the legacy <code>ProviderInterface</code> keep working in both modes (via a compatibility pass in single-pass mode) until 4.0.0.]]></comment>
+                <field id="skip_unchanged" translate="label comment" type="select" sortOrder="5"
+                       showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Skip Generation When Nothing Changed</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment><![CDATA[<strong>Default No, on purpose.</strong> When yes, the nightly run skips a store whose products, categories, CMS pages and module configuration all pre-date its last successful generation — no catalog pass at all. The check reads entity timestamps, so it does <em>not</em> notice stock movements (the stock table has no timestamp) or prices changed by catalog rules or scheduled updates. If your availability or prices move without the product row being saved, leave this <strong>No</strong> and pay for the nightly pass. <code>angeo:llms:generate --force</code> always rebuilds.]]></comment>
+                </field>
+
+                <field id="invalidate_mirror_on_save" translate="label comment" type="select" sortOrder="7"
+                       showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Invalidate Markdown Mirror on Save</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment><![CDATA[Drops the cached <code>.md</code> mirror of a product, category or CMS page when it is saved or deleted, the same way Magento invalidates the cached HTML page. Without it an edited page keeps serving its previous markdown until the HTTP TTL expires. Only that entity's cache entries are removed, never the whole mirror cache. Costs one <code>url_rewrite</code> lookup per save — switch off if a large import measurably slows down.]]></comment>
                 </field>
 
                 <field id="collection_page_size" translate="label comment" type="text" sortOrder="10"

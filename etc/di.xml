@@ -23,6 +23,7 @@
                 <item name="angeo_llms_generate" xsi:type="object">Angeo\LlmsTxt\Console\Command\GenerateCommand</item>
                 <item name="angeo_llms_status"   xsi:type="object">Angeo\LlmsTxt\Console\Command\StatusCommand</item>
                 <item name="angeo_llms_validate" xsi:type="object">Angeo\LlmsTxt\Console\Command\ValidateCommand</item>
+                <item name="angeo_llms_clean"    xsi:type="object">Angeo\LlmsTxt\Console\Command\CleanCommand</item>
             </argument>
         </arguments>
     </type>
@@ -47,60 +48,13 @@
         </arguments>
     </type>
 
-    <!-- ─── LLMs.txt providers (markdown) ─────────────────────────────
-         Order matters: StoreProvider MUST run first (emits the H1 + blockquote).
-      ── -->
-    <type name="Angeo\LlmsTxt\Model\Generator\LlmsTxtGenerator">
-        <arguments>
-            <argument name="providers" xsi:type="array">
-                <item name="store"    xsi:type="object">Angeo\LlmsTxt\Model\Provider\Llms\StoreProvider</item>
-                <item name="category" xsi:type="object">Angeo\LlmsTxt\Model\Provider\Llms\CategoryProvider</item>
-                <item name="cms"      xsi:type="object">Angeo\LlmsTxt\Model\Provider\Llms\CmsPageProvider</item>
-                <item name="product"  xsi:type="object">Angeo\LlmsTxt\Model\Provider\Llms\ProductProvider</item>
-            </argument>
-            <!-- Explicit injection required: Magento's ObjectManager passes the
-                 DEFAULT VALUE (null) for optional constructor params unless the
-                 argument is configured here — optional params are never
-                 auto-wired. Without these three lines the 3.3.0 signature falls
-                 back to lazy instantiation and the 3.4.0 hub block silently
-                 never renders. -->
-            <argument name="signature" xsi:type="object">Angeo\LlmsTxt\Model\Output\Signature</argument>
-            <argument name="surfacesBlock" xsi:type="object">Angeo\LlmsTxt\Model\Output\AgentSurfacesBlock</argument>
-            <argument name="surfaceRegistry" xsi:type="object">Angeo\LlmsTxt\Model\Output\SurfaceRegistry</argument>
-        </arguments>
-    </type>
-
-    <!-- ─── llms-full.txt providers ─── -->
-    <type name="Angeo\LlmsTxt\Model\Generator\LlmsFullTxtGenerator">
-        <arguments>
-            <argument name="providers" xsi:type="array">
-                <item name="store"    xsi:type="object">Angeo\LlmsTxt\Model\Provider\Llms\StoreProvider</item>
-                <item name="category" xsi:type="object">Angeo\LlmsTxt\Model\Provider\Llms\CategoryProvider</item>
-                <item name="cms"      xsi:type="object">Angeo\LlmsTxt\Model\Provider\Llms\CmsPageProvider</item>
-                <item name="product"  xsi:type="object">Angeo\LlmsTxt\Model\Provider\Llms\ProductProvider</item>
-            </argument>
-        </arguments>
-    </type>
-
-    <!-- ─── JSONL providers ─── -->
-    <type name="Angeo\LlmsTxt\Model\Generator\JsonlGenerator">
-        <arguments>
-            <argument name="providers" xsi:type="array">
-                <item name="store"    xsi:type="object">Angeo\LlmsTxt\Model\Provider\Jsonl\StoreProvider</item>
-                <item name="category" xsi:type="object">Angeo\LlmsTxt\Model\Provider\Jsonl\CategoryProvider</item>
-                <item name="cms"      xsi:type="object">Angeo\LlmsTxt\Model\Provider\Jsonl\CmsPageProvider</item>
-                <item name="product"  xsi:type="object">Angeo\LlmsTxt\Model\Provider\Jsonl\ProductProvider</item>
-            </argument>
-        </arguments>
-    </type>
-
-    <!-- ─── Single-pass pipeline (3.2.0) ──────────────────────────────
+    <!-- ─── Generation pipeline ───────────────────────────────────────
          One catalog pass per store renders every enabled format.
          Entity providers stream format-agnostic records (order matters:
          store record first — it carries the H1/blockquote); renderers are
-         keyed by the FORMAT_* code they serialize.
-         The legacy generator/provider wiring above is DEPRECATED and will be
-         removed in 4.0.0 together with generation_mode = legacy.
+         keyed by the FORMAT_* code they serialize. Third-party modules add
+         their own sections by implementing Api\EntityProviderInterface and
+         appending an item to entityProviders below.
       ── -->
     <type name="Angeo\LlmsTxt\Model\Pipeline\SinglePassGenerator">
         <arguments>
@@ -119,15 +73,56 @@
             <argument name="signature" xsi:type="object">Angeo\LlmsTxt\Model\Output\Signature</argument>
             <argument name="surfacesBlock" xsi:type="object">Angeo\LlmsTxt\Model\Output\AgentSurfacesBlock</argument>
             <argument name="surfaceRegistry" xsi:type="object">Angeo\LlmsTxt\Model\Output\SurfaceRegistry</argument>
+            <argument name="changeDetector" xsi:type="object">Angeo\LlmsTxt\Model\Pipeline\ChangeDetector</argument>
         </arguments>
     </type>
 
-    <!-- ─── agents.md generator hook (3.4.0) ───
-         GenerationService's agentsMdGenerator param is optional for BC —
-         which in Magento DI means it stays null unless injected here. -->
-    <type name="Angeo\LlmsTxt\Service\GenerationService">
+    <!-- ─── agents.md sitemap line (4.3.0) ────────────────────────────
+         Optional param, so wire it explicitly. -->
+    <type name="Angeo\LlmsTxt\Model\Generator\AgentsMdGenerator">
         <arguments>
-            <argument name="agentsMdGenerator" xsi:type="object">Angeo\LlmsTxt\Model\Generator\AgentsMdGenerator</argument>
+            <argument name="sitemapUrlResolver" xsi:type="object">Angeo\LlmsTxt\Model\Output\SitemapUrlResolver</argument>
         </arguments>
     </type>
+
+    <!-- ─── Salable status (4.2.0) ────────────────────────────────────
+         Optional param so the module still compiles where MSI is removed. -->
+    <type name="Angeo\LlmsTxt\Model\Pipeline\Provider\ProductEntityProvider">
+        <arguments>
+            <argument name="salableResolver" xsi:type="object">Angeo\LlmsTxt\Model\Stock\SalableStatusResolver</argument>
+        </arguments>
+    </type>
+
+    <!-- ─── Markdown mirror cache key (4.1.0) ─────────────────────────
+         Shared by the controller that fills the cache and the observer that
+         invalidates it — a duplicated hashing rule would mean invalidation
+         silently missing. Optional param, so wire it explicitly. -->
+    <type name="Angeo\LlmsTxt\Controller\Index\MdMirror">
+        <arguments>
+            <argument name="mdCacheKey" xsi:type="object">Angeo\LlmsTxt\Model\Cache\MdMirrorCacheKey</argument>
+        </arguments>
+    </type>
+
+    <!-- ─── Renderers ─────────────────────────────────────────────────
+         The Config/MarkdownUrl pair drives the llms.txt v2 rule that links
+         should point at the markdown version of a page. Both are optional
+         constructor params, so they must be wired explicitly. -->
+    <type name="Angeo\LlmsTxt\Model\Pipeline\Renderer\LlmsTxtRenderer">
+        <arguments>
+            <argument name="markdownUrl" xsi:type="object">Angeo\LlmsTxt\Model\Output\MarkdownUrl</argument>
+        </arguments>
+    </type>
+    <type name="Angeo\LlmsTxt\Model\Pipeline\Renderer\LlmsFullTxtRenderer">
+        <arguments>
+            <argument name="config" xsi:type="object">Angeo\LlmsTxt\Model\Config</argument>
+            <argument name="markdownUrl" xsi:type="object">Angeo\LlmsTxt\Model\Output\MarkdownUrl</argument>
+        </arguments>
+    </type>
+    <type name="Angeo\LlmsTxt\Model\Pipeline\Renderer\JsonlRenderer">
+        <arguments>
+            <argument name="linkConfig" xsi:type="object">Angeo\LlmsTxt\Model\Config</argument>
+            <argument name="markdownUrl" xsi:type="object">Angeo\LlmsTxt\Model\Output\MarkdownUrl</argument>
+        </arguments>
+    </type>
+
 </config>

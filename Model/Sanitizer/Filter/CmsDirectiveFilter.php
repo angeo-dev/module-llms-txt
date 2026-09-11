@@ -22,7 +22,7 @@ use Psr\Log\LoggerInterface;
  * Without this filter, directives appear in llms.txt as literal text — leaking
  * Magento template internals to AI crawlers and breaking embeddings.
  *
- * Runs inside the frontend-emulation scope set up by AbstractGenerator, so
+ * Runs inside the frontend-emulation scope set up by the pipeline, so
  * widgets resolve to what visitors actually see.
  *
  * SECURITY (3.1.0): product attribute content (descriptions) frequently comes

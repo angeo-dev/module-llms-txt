@@ -11,6 +11,7 @@ namespace Angeo\LlmsTxt\Model\Pipeline\Renderer;
 use Angeo\LlmsTxt\Api\Data\EntityRecordInterface;
 use Angeo\LlmsTxt\Api\OutputContextInterface;
 use Angeo\LlmsTxt\Model\Config;
+use Angeo\LlmsTxt\Model\Output\MarkdownUrl;
 use Angeo\LlmsTxt\Model\Text\Truncator;
 
 /**
@@ -34,9 +35,10 @@ class LlmsTxtRenderer extends AbstractRenderer
 
     public function __construct(
         Truncator $truncator,
-        private readonly Config $config
+        private readonly Config $config,
+        ?MarkdownUrl $markdownUrl = null
     ) {
-        parent::__construct($truncator);
+        parent::__construct($truncator, $config, $markdownUrl ?? new MarkdownUrl());
     }
 
     public function reset(): void
@@ -49,7 +51,13 @@ class LlmsTxtRenderer extends AbstractRenderer
         switch ($record->getType()) {
             case EntityRecordInterface::TYPE_STORE:
                 yield "# {$record->getName()}\n\n";
-                yield "> {$record->getSummary()}\n\n";
+                // A store with no meta description would otherwise emit a
+                // bare "> " — an empty blockquote, which is worse than none:
+                // it looks like a summary to a parser and carries nothing.
+                $summary = trim((string) $record->getSummary());
+                if ($summary !== '') {
+                    yield "> {$summary}\n\n";
+                }
                 yield sprintf(
                     "Base URL: %s · Currency: %s · Locale: %s\n\n",
                     $record->getUrl(),
@@ -60,7 +68,11 @@ class LlmsTxtRenderer extends AbstractRenderer
 
             case EntityRecordInterface::TYPE_CATEGORY:
                 yield from $this->enterSection('categories', "## Categories\n\n");
-                $line = sprintf('- [%s](%s)', $this->escapeMarkdown($record->getName()), $record->getUrl());
+                $line = sprintf(
+                    '- [%s](%s)',
+                    $this->escapeMarkdown($record->getName()),
+                    $this->publicUrl($record->getUrl(), $context)
+                );
                 $desc = $this->truncator->truncate($record->getContent(), self::CATEGORY_DESC_MAX);
                 if ($desc !== '') {
                     $line .= ': ' . $desc;
@@ -70,7 +82,11 @@ class LlmsTxtRenderer extends AbstractRenderer
 
             case EntityRecordInterface::TYPE_CMS_PAGE:
                 yield from $this->enterSection('pages', "## Pages\n\n");
-                $line = sprintf('- [%s](%s)', $this->escapeMarkdown($record->getName()), $record->getUrl());
+                $line = sprintf(
+                    '- [%s](%s)',
+                    $this->escapeMarkdown($record->getName()),
+                    $this->publicUrl($record->getUrl(), $context)
+                );
                 $excerpt = $this->truncator->truncate($record->getContent(), self::CMS_EXCERPT_MAX);
                 if ($excerpt !== '') {
                     $line .= ': ' . $excerpt;
@@ -84,7 +100,11 @@ class LlmsTxtRenderer extends AbstractRenderer
                     : "## Products\n\n";
                 yield from $this->enterSection('products', $header);
 
-                $line = sprintf('- [%s](%s)', $this->escapeMarkdown($record->getName()), $record->getUrl());
+                $line = sprintf(
+                    '- [%s](%s)',
+                    $this->escapeMarkdown($record->getName()),
+                    $this->publicUrl($record->getUrl(), $context)
+                );
                 $parts = [];
                 $short = $this->truncator->truncate($record->getShortContent(), self::PRODUCT_SHORT_MAX);
                 if ($short !== '') {
@@ -97,6 +117,10 @@ class LlmsTxtRenderer extends AbstractRenderer
                         number_format($price, 2, '.', ''),
                         $context->getCurrencyCode()
                     );
+                }
+                $inStock = $record->isInStock();
+                if ($inStock !== null) {
+                    $parts[] = $inStock ? 'In stock' : 'Out of stock';
                 }
                 if ($parts !== []) {
                     $line .= ': ' . implode(' — ', $parts);

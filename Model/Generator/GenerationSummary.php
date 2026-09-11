@@ -9,7 +9,7 @@ declare(strict_types=1);
 namespace Angeo\LlmsTxt\Model\Generator;
 
 /**
- * Mutable summary collected during a {@see AbstractGenerator::generate()} run.
+ * Mutable summary collected during one generation run, keyed by store.
  *
  * Used by the CLI command and admin status panel to report per-store outcomes
  * without re-querying the status repository.

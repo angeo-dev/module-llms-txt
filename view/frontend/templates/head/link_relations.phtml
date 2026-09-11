@@ -1,0 +1,20 @@
+<?php
+/**
+ * llms.txt v2 link relations.
+ *
+ * Theme-independent: two <link> tags, no JavaScript, no CSS classes, no
+ * x-magento-init. Renders identically under Luma and Hyvä, so no Hyvä
+ * compatibility module or template override is required.
+ *
+ * @var \Angeo\LlmsTxt\Block\Head\LinkRelations $block
+ * @var \Magento\Framework\Escaper $escaper
+ */
+$mdUrl   = $block->getMarkdownUrl();
+$llmsUrl = $block->getLlmsTxtUrl();
+
+if ($mdUrl === null) {
+    return;
+}
+?>
+<link rel="alternate" type="text/markdown" href="<?= $escaper->escapeUrl($mdUrl) ?>"/>
+<link rel="describedby" href="<?= $escaper->escapeUrl($llmsUrl) ?>"/>

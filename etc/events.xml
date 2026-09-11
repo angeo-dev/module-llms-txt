@@ -1,0 +1,40 @@
+<?xml version="1.0"?>
+<!--
+  ~ Angeo LLMs.txt — markdown mirror invalidation.
+  ~
+  ~ Declared globally, not just in adminhtml: products and CMS pages are also
+  ~ saved by imports, the API and CLI scripts, and a mirror left stale by a
+  ~ REST update is just as wrong as one left stale by an admin edit.
+  ~
+  ~ @license MIT
+  -->
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:framework:Event/etc/events.xsd">
+
+    <event name="catalog_product_save_after">
+        <observer name="angeo_llms_invalidate_md_mirror"
+                  instance="Angeo\LlmsTxt\Observer\InvalidateMdMirrorCache"/>
+    </event>
+    <event name="catalog_product_delete_after">
+        <observer name="angeo_llms_invalidate_md_mirror"
+                  instance="Angeo\LlmsTxt\Observer\InvalidateMdMirrorCache"/>
+    </event>
+
+    <event name="catalog_category_save_after">
+        <observer name="angeo_llms_invalidate_md_mirror"
+                  instance="Angeo\LlmsTxt\Observer\InvalidateMdMirrorCache"/>
+    </event>
+    <event name="catalog_category_delete_after">
+        <observer name="angeo_llms_invalidate_md_mirror"
+                  instance="Angeo\LlmsTxt\Observer\InvalidateMdMirrorCache"/>
+    </event>
+
+    <event name="cms_page_save_after">
+        <observer name="angeo_llms_invalidate_md_mirror"
+                  instance="Angeo\LlmsTxt\Observer\InvalidateMdMirrorCache"/>
+    </event>
+    <event name="cms_page_delete_after">
+        <observer name="angeo_llms_invalidate_md_mirror"
+                  instance="Angeo\LlmsTxt\Observer\InvalidateMdMirrorCache"/>
+    </event>
+</config>
