@@ -2,7 +2,7 @@
     "name": "angeo/module-llms-txt",
     "description": "Magento 2 module for AI Engine Optimization (AEO). Generates llms.txt and llms-full.txt to the llmstxt.org v2 specification, plus streaming JSONL for vector indexing and agents.md for AI shopping agents. Link relations, markdown mirrors, agentic discovery sitemap, availability and attribute export, multi-store, CLI, cron, async admin UI, Page Builder-aware sanitization, customer-group pricing, atomic writes, ETag/Cache-Control. Natively Hyvä-compatible — no frontend JS or CSS.",
     "type": "magento2-module",
-    "version": "4.3.0",
+    "version": "4.3.1",
     "keywords": [
         "magento2",
         "magento-module",
@@ -37,18 +37,18 @@
     ],
     "license": "MIT",
     "require": {
-        "php": "~8.2.0||~8.3.0||~8.4.0||~8.5.0",
+        "php": "~8.1.0||~8.2.0||~8.3.0||~8.4.0||~8.5.0",
         "ext-json": "*",
         "ext-mbstring": "*",
-        "magento/framework": ">=102.0",
-        "magento/module-store": ">=101.0",
-        "magento/module-catalog": ">=104.0",
-        "magento/module-cms": ">=104.0",
-        "magento/module-backend": ">=102.0",
-        "magento/module-config": ">=101.2",
-        "magento/module-url-rewrite": ">=102.0",
-        "magento/module-catalog-url-rewrite": ">=100.4",
-        "magento/module-catalog-inventory": ">=100.4"
+        "magento/framework": "^103.0",
+        "magento/module-store": "^101.0",
+        "magento/module-catalog": "^104.0",
+        "magento/module-cms": "^104.0",
+        "magento/module-backend": "^102.0",
+        "magento/module-config": "^101.2",
+        "magento/module-url-rewrite": "^102.0",
+        "magento/module-catalog-url-rewrite": "^100.4",
+        "magento/module-catalog-inventory": "^100.4"
     },
     "require-dev": {
         "phpunit/phpunit": "^10.5",
