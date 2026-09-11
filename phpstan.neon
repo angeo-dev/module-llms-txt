@@ -1,0 +1,63 @@
+includes:
+    - vendor/bitexpert/phpstan-magento/extension.neon
+
+parameters:
+    level: 5
+
+    paths:
+        - .
+
+    excludePaths:
+        analyseAndScan:
+            - vendor
+            - Test
+        # stubs/ must stay scannable (PHPStan needs the class definitions)
+        # but must not be analysed itself
+        analyse:
+            - stubs
+
+    # Magento generates *Factory classes at runtime. Declaring them here gives
+    # PHPStan the reflection it needs without the extension's on-the-fly
+    # factory autoloader, which breaks on some PHP versions.
+    scanDirectories:
+        - stubs
+
+    # The extension's generated-class cache is not safe across PHPStan's
+    # parallel workers, so keep the analysis single-process.
+    tmpDir: .phpstan-cache
+
+    parallel:
+        maximumNumberOfProcesses: 1
+
+    # Magento core PHPDoc blocks are often inaccurate; do not treat them as facts
+    treatPhpDocTypesAsCertain: false
+
+    # Do not fail when an ignore pattern matches nothing
+    reportUnmatchedIgnoredErrors: false
+
+    ignoreErrors:
+        # Magento service contracts are narrower than the concrete classes the
+        # object manager actually returns. Calling Store, Product, Category and
+        # Request methods through the interface is standard practice in Magento.
+        - '#Call to an undefined method Magento\\Store\\Api\\Data\\StoreInterface::#'
+        - '#Call to an undefined method Magento\\Catalog\\Api\\Data\\ProductInterface::#'
+        - '#Call to an undefined method Magento\\Catalog\\Api\\Data\\CategoryInterface::#'
+        - '#Call to an undefined method Magento\\Catalog\\Model\\Product::#'
+        - '#Call to an undefined method Magento\\Framework\\App\\RequestInterface::#'
+
+        # Magento\Framework\Filter\Template has setStoreId() via magic __call
+        - '#Call to an undefined method Magento\\Framework\\Filter\\Template::#'
+
+        # Symfony console getHelper() returns HelperInterface; QuestionHelper::ask() exists
+        - '#Call to an undefined method Symfony\\Component\\Console\\Helper\\HelperInterface::ask\(\)#'
+
+        # ManagerInterface is documented as string but accepts Phrase everywhere
+        - '#expects string, Magento\\Framework\\Phrase given#'
+
+        # Optional MSI packages; the module falls back to the legacy stock index
+        - '#Class Magento\\InventorySalesApi\\.* not found\.#'
+
+        # Magento\Cron has no repository for Schedule; core calls save() directly
+        -
+            identifier: bitExpertMagento.abstractModelUseServiceContract
+            path: Controller/Adminhtml/Generate/Schedule.php

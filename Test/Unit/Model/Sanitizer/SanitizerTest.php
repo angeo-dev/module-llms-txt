@@ -11,6 +11,7 @@ namespace Angeo\LlmsTxt\Test\Unit\Model\Sanitizer;
 use Angeo\LlmsTxt\Api\OutputContextInterface;
 use Angeo\LlmsTxt\Api\SanitizerFilterInterface;
 use Angeo\LlmsTxt\Model\Sanitizer\Sanitizer;
+use Magento\Store\Model\Store;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
@@ -53,11 +54,9 @@ class SanitizerTest extends TestCase
         $f2 = $this->createMock(SanitizerFilterInterface::class);
         $f2->method('filter')->willReturnCallback(fn(string $c) => strtoupper($c));
 
-        $store = new \stdClass();
-        $store->code = 'default';
-        $this->context->method('getStore')->willReturn(new class {
-            public function getCode(): string { return 'default'; }
-        });
+        $store = $this->createMock(Store::class);
+        $store->method('getCode')->willReturn('default');
+        $this->context->method('getStore')->willReturn($store);
 
         $this->logger->expects(self::once())->method('warning');
 

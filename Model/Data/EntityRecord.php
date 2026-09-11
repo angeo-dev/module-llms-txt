@@ -15,6 +15,7 @@ use Angeo\LlmsTxt\Api\Data\EntityRecordInterface;
  *
  * @since 3.2.0
  */
+// phpcs:ignore Magento2.PHP.FinalImplementation
 final class EntityRecord implements EntityRecordInterface
 {
     public function __construct(

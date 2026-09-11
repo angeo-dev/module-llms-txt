@@ -13,6 +13,7 @@ use Angeo\LlmsTxt\Controller\Index\Index as IndexController;
 use Angeo\LlmsTxt\Controller\Index\MdMirror as MdMirrorController;
 use Angeo\LlmsTxt\Model\Config;
 use Magento\Framework\App\ActionFactory;
+use Magento\Framework\App\ActionInterface;
 use Magento\Framework\App\RequestInterface;
 use Magento\Framework\App\RouterInterface;
 use Magento\Store\Model\StoreManagerInterface;
@@ -68,7 +69,13 @@ class Router implements RouterInterface
     ) {
     }
 
-    public function match(RequestInterface $request): mixed
+    /**
+     * Resolve an AI-discovery path to its controller, or decline the match.
+     *
+     * @param RequestInterface $request
+     * @return ActionInterface|null
+     */
+    public function match(RequestInterface $request): ?ActionInterface
     {
         $path = trim((string) $request->getPathInfo(), '/');
         if ($path === '') {

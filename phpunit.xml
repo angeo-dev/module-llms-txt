@@ -1,26 +1,25 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:noNamespaceSchemaLocation="https://schema.phpunit.de/10.5/phpunit.xsd"
-         bootstrap="../../../../dev/tests/unit/framework/bootstrap.php"
+         bootstrap="vendor/autoload.php"
+         cacheDirectory=".phpunit.cache"
          colors="true"
-         displayDetailsOnTestsThatTriggerWarnings="true"
-         displayDetailsOnTestsThatTriggerErrors="true"
          failOnWarning="true"
-         failOnRisky="true">
+         failOnRisky="true"
+         beStrictAboutOutputDuringTests="true">
     <testsuites>
-        <testsuite name="Angeo_LlmsTxt Unit Tests">
+        <testsuite name="Angeo_LlmsTxt unit tests">
             <directory>Test/Unit</directory>
         </testsuite>
     </testsuites>
+
     <source>
         <include>
-            <directory>.</directory>
+            <directory suffix=".php">.</directory>
         </include>
         <exclude>
-            <directory>Test</directory>
             <directory>vendor</directory>
-            <directory>view</directory>
-            <directory>etc</directory>
+            <directory>Test</directory>
         </exclude>
     </source>
 </phpunit>

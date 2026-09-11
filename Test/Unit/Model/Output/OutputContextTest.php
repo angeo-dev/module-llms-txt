@@ -12,7 +12,7 @@ use Angeo\LlmsTxt\Api\OutputContextInterface;
 use Angeo\LlmsTxt\Model\Output\OutputContext;
 use Magento\Framework\App\Config\ScopeConfigInterface;
 use Magento\Framework\UrlInterface;
-use Magento\Store\Api\Data\StoreInterface;
+use Magento\Store\Model\Store;
 use Magento\Store\Model\ScopeInterface;
 use PHPUnit\Framework\TestCase;
 
@@ -21,12 +21,12 @@ use PHPUnit\Framework\TestCase;
  */
 class OutputContextTest extends TestCase
 {
-    private StoreInterface $store;
+    private Store $store;
     private ScopeConfigInterface $scopeConfig;
 
     protected function setUp(): void
     {
-        $this->store = $this->createMock(StoreInterface::class);
+        $this->store = $this->createMock(Store::class);
         $this->store->method('getId')->willReturn(1);
         $this->store->method('getBaseUrl')->with(UrlInterface::URL_TYPE_WEB)->willReturn('https://example.test/');
         $this->store->method('getCurrentCurrencyCode')->willReturn('USD');

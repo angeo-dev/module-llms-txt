@@ -160,6 +160,8 @@ class AgentsMdBuilder
     {
         $value = str_replace(["\r", "\n"], ' ', $value);
         $value = preg_replace('/[#>`]/', '', $value) ?? '';
+        // Stripping markdown markers can leave double spaces behind
+        $value = preg_replace('/\s+/', ' ', $value) ?? '';
         return trim($value);
     }
 }

@@ -48,8 +48,8 @@ class ProductEntityProvider implements EntityProviderInterface
         private readonly SanitizerInterface $sanitizer,
         private readonly UrlResolverInterface $urlResolver,
         private readonly StockHelper $stockHelper,
-        private readonly ?SalableStatusResolver $salableResolver = null,
-        private readonly Config $config
+        private readonly Config $config,
+        private readonly ?SalableStatusResolver $salableResolver = null
     ) {
     }
 
@@ -87,7 +87,7 @@ class ProductEntityProvider implements EntityProviderInterface
                 $select[] = 'image';
             }
             $collection->addAttributeToSelect(array_values(array_unique(array_merge($select, $extraCodes))));
-            $collection->addAttributeToFilter('status', Status::STATUS_ENABLED);
+            $collection->addAttributeToFilter('status', ['eq' => Status::STATUS_ENABLED]);
             $collection->addAttributeToFilter('visibility', [
                 'in' => [
                     Visibility::VISIBILITY_IN_CATALOG,

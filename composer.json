@@ -2,7 +2,7 @@
     "name": "angeo/module-llms-txt",
     "description": "Magento 2 module for AI Engine Optimization (AEO). Generates llms.txt and llms-full.txt to the llmstxt.org v2 specification, plus streaming JSONL for vector indexing and agents.md for AI shopping agents. Link relations, markdown mirrors, agentic discovery sitemap, availability and attribute export, multi-store, CLI, cron, async admin UI, Page Builder-aware sanitization, customer-group pricing, atomic writes, ETag/Cache-Control. Natively Hyvä-compatible — no frontend JS or CSS.",
     "type": "magento2-module",
-    "version": "4.3.1",
+    "version": "4.3.2",
     "keywords": [
         "magento2",
         "magento-module",
@@ -52,8 +52,10 @@
     },
     "require-dev": {
         "phpunit/phpunit": "^10.5",
-        "magento/magento-coding-standard": "^32.0",
-        "phpstan/phpstan": "^2.0"
+        "magento/magento-coding-standard": "^40.0 || ^41.0",
+        "phpstan/phpstan": "^2.0",
+        "bitexpert/phpstan-magento": "^0.43",
+        "magento/module-cron": "^100.4"
     },
     "suggest": {
         "magento/module-page-builder": "Enable to opt-in or opt-out of Page Builder content elements per content-type during sanitization",
@@ -71,6 +73,18 @@
     "autoload-dev": {
         "psr-4": {
             "Angeo\\LlmsTxt\\Test\\": "Test/"
+        }
+    },
+    "config": {
+        "allow-plugins": {
+            "dealerdirect/phpcodesniffer-composer-installer": true,
+            "phpstan/extension-installer": true,
+            "magento/composer-dependency-version-audit-plugin": false,
+            "mage-os/composer-dependency-version-audit-plugin": false,
+            "magento/magento-composer-installer": false,
+            "magento/inventory-composer-installer": false,
+            "laminas/laminas-dependency-plugin": false,
+            "php-http/discovery": false
         }
     }
 }

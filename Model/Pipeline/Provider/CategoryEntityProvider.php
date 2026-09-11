@@ -52,7 +52,7 @@ class CategoryEntityProvider implements EntityProviderInterface
         $collection = $this->categoryCollectionFactory->create();
         $collection->setStoreId($storeId);
         $collection->addAttributeToSelect(['name', 'description', 'url_key']);
-        $collection->addAttributeToFilter('is_active', 1);
+        $collection->addAttributeToFilter('is_active', ['eq' => 1]);
         $collection->addAttributeToFilter('path', ['like' => '1/' . $rootCategoryId . '/%']);
         $collection->setOrder('position', 'ASC');
 

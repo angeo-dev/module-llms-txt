@@ -12,7 +12,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        php: ['8.2', '8.3', '8.4', '8.5']
+        php: ['8.1', '8.2', '8.3', '8.4', '8.5']
 
     steps:
       - uses: actions/checkout@v4
@@ -21,21 +21,34 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: ${{ matrix.php }}
-          extensions: json, mbstring, dom, simplexml
+          extensions: bcmath, ctype, curl, dom, gd, iconv, intl, json, mbstring, openssl, pdo_mysql, simplexml, soap, sockets, sodium, xsl, zip
           coverage: none
           tools: composer:v2
 
       - name: Validate composer.json
-        run: composer validate --strict
+        run: composer validate --strict --no-check-version
+
+      # magento/* packages are not on Packagist. The Mage-OS mirror serves
+      # them publicly with the same version numbers. canonical=false lets
+      # Composer still take newer versions of other packages from Packagist.
+      - name: Add Magento package mirror
+        run: composer config repositories.mage-os '{"type":"composer","url":"https://mirror.mage-os.org/","canonical":false}'
 
       - name: Install dependencies
-        run: composer install --prefer-dist --no-progress --no-interaction
+        run: composer update --prefer-dist --no-progress --no-interaction
+
+      # phpcodesniffer-composer-installer registers Magento2 automatically.
+      # This step only makes the registration visible in the log.
+      - name: Show installed coding standards
+        run: vendor/bin/phpcs -i
 
       - name: Lint PHP
         run: find . -path ./vendor -prune -o -name '*.php' -print0 | xargs -0 -n1 -P4 php -l
 
+      # stubs/ holds PHPStan-only class declarations (several classes per file
+      # on purpose), so it is not real module code and is not linted here.
       - name: Magento coding standard
-        run: vendor/bin/phpcs --standard=Magento2 --extensions=php,phtml --ignore=vendor .
+        run: vendor/bin/phpcs -n --standard=Magento2 --extensions=php,phtml --ignore='vendor/*,stubs/*' .
 
       - name: Static analysis
         run: vendor/bin/phpstan analyse --no-progress
