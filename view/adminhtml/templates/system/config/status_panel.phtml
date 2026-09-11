@@ -26,6 +26,14 @@ $url = $block->getStatusUrl();
             <tr><td colspan="7" style="padding:12px; text-align:center; color:#666;"><?= /* @noEscape */ __('Loading status…') ?></td></tr>
         </tbody>
     </table>
+    <p style="margin:10px 0 0; padding:8px 10px; background:#f8f8f8; border-left:3px solid #4690BF; color:#41362f;">
+        <strong><?= $block->escapeHtml(__('Next step:')) ?></strong>
+        <?= $block->escapeHtml(__('generated files tell AI engines about your store — now check how they actually see it.')) ?>
+        <a href="<?= $block->escapeUrl($block->getScanUrl()) ?>" target="_blank" rel="noopener">
+            <?= $block->escapeHtml(__('Run a free AEO scan')) ?></a>.
+        <?= $block->escapeHtml(__('Large catalog or custom setup?')) ?>
+        <a href="mailto:<?= $block->escapeHtmlAttr($block->getSupportEmail()) ?>"><?= $block->escapeHtml($block->getSupportEmail()) ?></a>
+    </p>
 </div>
 
 <script>

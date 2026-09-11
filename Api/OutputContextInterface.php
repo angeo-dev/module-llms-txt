@@ -36,6 +36,9 @@ interface OutputContextInterface
     public const FORMAT_LLMS_FULL_TXT = 'llms_full_txt';
     public const FORMAT_JSONL         = 'jsonl';
 
+    /** @since 3.4.0 — operator's manual for AI agents (agents.md convention). */
+    public const FORMAT_AGENTS_MD     = 'agents_md';
+
     /**
      * Verbosity constants for {@see getVerbosity()}.
      *

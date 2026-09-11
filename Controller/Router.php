@@ -25,6 +25,7 @@ use Psr\Log\LoggerInterface;
  *   /llms-full.txt   → Index controller, file=llms-full.txt
  *   /llms.jsonl      → Index controller, file=llms.jsonl
  *   /llms-full.jsonl → Index controller, file=llms-full.jsonl (alias of .jsonl)
+ *   /agents.md       → Index controller, file=agents.md (since 3.4.0)
  *   /{path}.md       → MdMirror controller (when md_mirror is enabled)
  *
  * Multi-store: Magento's store-resolution (path-based or code-based) has already
@@ -51,6 +52,7 @@ class Router implements RouterInterface
         'llms-full.txt'   => true,
         'llms.jsonl'      => true,
         'llms-full.jsonl' => true,
+        'agents.md'       => true, // checked BEFORE the .md-mirror branch (since 3.4.0)
     ];
 
     public function __construct(

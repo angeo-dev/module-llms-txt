@@ -46,6 +46,7 @@ class Index implements ActionInterface, HttpGetActionInterface
         'llms.jsonl'      => 'application/x-ndjson; charset=utf-8',
         // Alias: llms-full.jsonl serves the same dataset file as llms.jsonl.
         'llms-full.jsonl' => 'application/x-ndjson; charset=utf-8',
+        'agents.md'       => 'text/markdown; charset=utf-8',
     ];
 
     /** Files at or below this size are returned via a Raw result (FPC-friendly). */
@@ -139,6 +140,7 @@ class Index implements ActionInterface, HttpGetActionInterface
             'llms.txt'        => OutputContextInterface::FORMAT_LLMS_TXT,
             'llms-full.txt'   => OutputContextInterface::FORMAT_LLMS_FULL_TXT,
             'llms.jsonl', 'llms-full.jsonl' => OutputContextInterface::FORMAT_JSONL,
+            'agents.md'       => OutputContextInterface::FORMAT_AGENTS_MD,
             default => null,
         };
         return $format === null ? null : $this->pathResolver->getRelativePath($format, $storeCode);

@@ -19,6 +19,7 @@ use Angeo\LlmsTxt\Api\OutputContextInterface;
  *   media/angeo/llms/llms_{storeCode}.txt
  *   media/angeo/llms/llms-full_{storeCode}.txt
  *   media/angeo/llms/llms_{storeCode}.jsonl
+ *   media/angeo/llms/agents_{storeCode}.md
  *
  * @api
  * @since 3.2.0
@@ -31,6 +32,7 @@ class FilePathResolver
         OutputContextInterface::FORMAT_LLMS_TXT      => ['llms', 'txt'],
         OutputContextInterface::FORMAT_LLMS_FULL_TXT => ['llms-full', 'txt'],
         OutputContextInterface::FORMAT_JSONL         => ['llms', 'jsonl'],
+        OutputContextInterface::FORMAT_AGENTS_MD     => ['agents', 'md'],
     ];
 
     /**

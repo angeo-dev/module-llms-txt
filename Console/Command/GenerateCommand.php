@@ -57,7 +57,7 @@ class GenerateCommand extends Command
         }
 
         $output->writeln('');
-        $output->writeln('<info>Angeo LLMs.txt Generator 3.0</info>');
+        $output->writeln('<info>Angeo LLMs.txt Generator ' . Config::MODULE_VERSION . '</info>');
         $output->writeln('');
 
         if (!$this->config->isEnabled()) {
@@ -87,6 +87,21 @@ class GenerateCommand extends Command
             '<info>Total time: %.2fs</info>',
             microtime(true) - $start
         ));
+
+        $anySuccess = false;
+        foreach ($summaries as $summary) {
+            if ($summary->getSuccesses() !== []) {
+                $anySuccess = true;
+                break;
+            }
+        }
+        if ($anySuccess) {
+            $output->writeln('');
+            $output->writeln(
+                '<comment>Next: check how AI engines actually see this store — '
+                . 'free AEO scan at https://angeo.dev/scan?utm_source=cli</comment>'
+            );
+        }
 
         foreach ($summaries as $summary) {
             if ($summary->hasFailures()) {

@@ -43,6 +43,24 @@ class StatusPanel extends Field
     }
 
     /**
+     * External free-scan URL shown as the panel's next-step CTA.
+     *
+     * @since 3.3.0
+     */
+    public function getScanUrl(): string
+    {
+        return 'https://angeo.dev/scan?utm_source=magento-admin&utm_medium=status-panel';
+    }
+
+    /**
+     * @since 3.3.0
+     */
+    public function getSupportEmail(): string
+    {
+        return 'support@angeo.dev';
+    }
+
+    /**
      * Returning '' makes the row span the full width without the standard label.
      */
     protected function _renderScopeLabel(AbstractElement $element): string

@@ -58,6 +58,15 @@
                 <item name="cms"      xsi:type="object">Angeo\LlmsTxt\Model\Provider\Llms\CmsPageProvider</item>
                 <item name="product"  xsi:type="object">Angeo\LlmsTxt\Model\Provider\Llms\ProductProvider</item>
             </argument>
+            <!-- Explicit injection required: Magento's ObjectManager passes the
+                 DEFAULT VALUE (null) for optional constructor params unless the
+                 argument is configured here — optional params are never
+                 auto-wired. Without these three lines the 3.3.0 signature falls
+                 back to lazy instantiation and the 3.4.0 hub block silently
+                 never renders. -->
+            <argument name="signature" xsi:type="object">Angeo\LlmsTxt\Model\Output\Signature</argument>
+            <argument name="surfacesBlock" xsi:type="object">Angeo\LlmsTxt\Model\Output\AgentSurfacesBlock</argument>
+            <argument name="surfaceRegistry" xsi:type="object">Angeo\LlmsTxt\Model\Output\SurfaceRegistry</argument>
         </arguments>
     </type>
 
@@ -106,6 +115,19 @@
                 <item name="llms_full_txt" xsi:type="object">Angeo\LlmsTxt\Model\Pipeline\Renderer\LlmsFullTxtRenderer</item>
                 <item name="jsonl"         xsi:type="object">Angeo\LlmsTxt\Model\Pipeline\Renderer\JsonlRenderer</item>
             </argument>
+            <!-- Explicit: optional params get their defaults (null) unless configured. -->
+            <argument name="signature" xsi:type="object">Angeo\LlmsTxt\Model\Output\Signature</argument>
+            <argument name="surfacesBlock" xsi:type="object">Angeo\LlmsTxt\Model\Output\AgentSurfacesBlock</argument>
+            <argument name="surfaceRegistry" xsi:type="object">Angeo\LlmsTxt\Model\Output\SurfaceRegistry</argument>
+        </arguments>
+    </type>
+
+    <!-- ─── agents.md generator hook (3.4.0) ───
+         GenerationService's agentsMdGenerator param is optional for BC —
+         which in Magento DI means it stays null unless injected here. -->
+    <type name="Angeo\LlmsTxt\Service\GenerationService">
+        <arguments>
+            <argument name="agentsMdGenerator" xsi:type="object">Angeo\LlmsTxt\Model\Generator\AgentsMdGenerator</argument>
         </arguments>
     </type>
 </config>

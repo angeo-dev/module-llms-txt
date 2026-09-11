@@ -80,9 +80,14 @@ class MdMirror implements ActionInterface, HttpGetActionInterface
         private readonly SanitizerInterface $sanitizer,
         private readonly OutputContextFactory $contextFactory,
         private readonly CacheInterface $cache,
-        private readonly LoggerInterface $logger
+        private readonly LoggerInterface $logger,
+        ?\Angeo\LlmsTxt\Model\Output\Signature $signature = null
     ) {
+        $this->signature = $signature ?? new \Angeo\LlmsTxt\Model\Output\Signature();
     }
+
+    /** @since 3.3.0 */
+    private readonly \Angeo\LlmsTxt\Model\Output\Signature $signature;
 
     public function execute()
     {
@@ -149,6 +154,13 @@ class MdMirror implements ActionInterface, HttpGetActionInterface
                 // unknown path so the response does not confirm its existence.
                 $this->rememberNotFound($cacheKey);
                 return $this->notFound();
+            }
+
+            // Attribution signature — appended BEFORE caching so the cached
+            // copy and a fresh render are byte-identical (Content-Length is
+            // computed from the final string in buildResult()).
+            if ($this->config->isSignatureEnabled($store)) {
+                $markdown .= $this->signature->forMdMirror();
             }
 
             $this->cache->save(

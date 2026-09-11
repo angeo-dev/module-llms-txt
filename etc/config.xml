@@ -7,6 +7,9 @@
                 <enabled>1</enabled>
                 <exclude_store>0</exclude_store>
                 <store_summary></store_summary>
+                <!-- Attribution footer on markdown output (never JSONL).
+                     Default on; merchants may disable it — see system.xml. -->
+                <signature_enabled>1</signature_enabled>
             </general>
             <content>
                 <include_categories>1</include_categories>
@@ -22,6 +25,7 @@
                 <generate_llms_txt>1</generate_llms_txt>
                 <generate_llms_full_txt>0</generate_llms_full_txt>
                 <generate_jsonl>1</generate_jsonl>
+                <generate_agents_md>1</generate_agents_md>
                 <generate_md_mirror>0</generate_md_mirror>
             </formats>
             <sanitizer>

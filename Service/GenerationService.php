@@ -57,9 +57,14 @@ class GenerationService
         private readonly JsonlGenerator $jsonlGenerator,
         private readonly CacheInterface $cache,
         private readonly Config $config,
-        private readonly SinglePassGenerator $singlePassGenerator
+        private readonly SinglePassGenerator $singlePassGenerator,
+        ?\Angeo\LlmsTxt\Model\Generator\AgentsMdGenerator $agentsMdGenerator = null
     ) {
+        $this->agentsMdGenerator = $agentsMdGenerator;
     }
+
+    /** @since 3.4.0 — optional for BC with 3.2/3.3 constructor signatures. */
+    private readonly ?\Angeo\LlmsTxt\Model\Generator\AgentsMdGenerator $agentsMdGenerator;
 
     /**
      * Run all generators.
@@ -77,6 +82,10 @@ class GenerationService
                 $this->collectLegacyExtraProviders()
             )
             : $this->runLegacy($storeCode, $skip);
+
+        // agents.md is store-level metadata, not catalog content — generated
+        // by its own generator so it works identically under both pipelines.
+        $this->agentsMdGenerator?->generateAll($storeCode);
 
         // Invalidate cached /{url}.md mirrors: content was just regenerated, so
         // mirrors must not keep serving the previous catalog state for a full TTL.

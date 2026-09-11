@@ -14,6 +14,9 @@ use Angeo\LlmsTxt\Api\ProviderInterface;
 use Angeo\LlmsTxt\Api\UrlResolverInterface;
 use Angeo\LlmsTxt\Model\Config;
 use Angeo\LlmsTxt\Model\Output\OutputContextFactory;
+use Angeo\LlmsTxt\Model\Output\AgentSurfacesBlock;
+use Angeo\LlmsTxt\Model\Output\Signature;
+use Angeo\LlmsTxt\Model\Output\SurfaceRegistry;
 use Magento\Framework\App\Area;
 use Magento\Framework\App\Filesystem\DirectoryList;
 use Magento\Framework\Event\ManagerInterface as EventManagerInterface;
@@ -68,9 +71,25 @@ abstract class AbstractGenerator
         protected readonly UrlResolverInterface          $urlResolver,
         protected readonly EventManagerInterface         $eventManager,
         protected readonly GenerationStatusRepositoryInterface $statusRepository,
-        protected readonly array                         $providers = []
+        protected readonly array                         $providers = [],
+        ?Signature                                       $signature = null,
+        ?AgentSurfacesBlock                              $surfacesBlock = null,
+        ?SurfaceRegistry                                 $surfaceRegistry = null
     ) {
+        // Optional + lazily defaulted so third-party subclasses compiled against
+        // the 3.0–3.2 constructor signature keep working (this class is
+        // @deprecated but must stay BC until 4.0.0).
+        $this->signature = $signature ?? new Signature();
+        $this->surfacesBlock = $surfacesBlock;
+        $this->surfaceRegistry = $surfaceRegistry;
     }
+
+    /** @since 3.3.0 */
+    private readonly Signature $signature;
+    /** @since 3.4.0 */
+    private readonly ?AgentSurfacesBlock $surfacesBlock;
+    /** @since 3.4.0 */
+    private readonly ?SurfaceRegistry $surfaceRegistry;
 
     /**
      * Output format constant — one of {@see OutputContextInterface}::FORMAT_*.
@@ -297,6 +316,25 @@ abstract class AbstractGenerator
                         $store->getCode(),
                         $e->getMessage()
                     ));
+                }
+            }
+            // Agent-discovery hub block (llms.txt only) + attribution
+            // signature — markdown formats only (a comment line would corrupt
+            // JSONL), only when real content was written. Not counted as items.
+            if ($bytes > 0 && $this->getExtension() === 'txt') {
+                if ($this->getFormat() === \Angeo\LlmsTxt\Api\OutputContextInterface::FORMAT_LLMS_TXT
+                    && $this->surfacesBlock !== null
+                ) {
+                    $block = $this->surfacesBlock->render(
+                        $context->getBaseUrl(),
+                        $this->surfaceRegistry !== null ? $this->surfaceRegistry->forStore($store) : []
+                    );
+                    if ($block !== '') {
+                        $bytes += $stream->write($block);
+                    }
+                }
+                if ($this->config->isSignatureEnabled($store)) {
+                    $bytes += $stream->write($this->signature->forTxt());
                 }
             }
         } finally {
