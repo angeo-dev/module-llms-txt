@@ -1,16 +1,23 @@
 # Angeo LLMs.txt — Magento 2 Module
 
+[![CI](https://github.com/angeo-dev/module-llms-txt/actions/workflows/ci.yml/badge.svg)](https://github.com/angeo-dev/module-llms-txt/actions/workflows/ci.yml)
+[![Packagist Version](https://img.shields.io/packagist/v/angeo/module-llms-txt)](https://packagist.org/packages/angeo/module-llms-txt)
+[![Downloads](https://img.shields.io/packagist/dt/angeo/module-llms-txt)](https://packagist.org/packages/angeo/module-llms-txt)
+[![PHP](https://img.shields.io/badge/PHP-8.1%20%E2%80%93%208.5-777bb4)](composer.json)
+[![Magento](https://img.shields.io/badge/Magento-2.4.7%20%E2%80%93%202.4.9-f26322)](composer.json)
+[![Mage-OS Directory](https://img.shields.io/badge/Mage--OS-Extension%20Directory-2d7d9a)](https://directory.mage-os.org/packages/angeo/module-llms-txt/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+[![Hyvä](https://img.shields.io/badge/Hyv%C3%A4-natively%20compatible-brightgreen)](https://www.hyva.io/)
+
 **AI Engine Optimization (AEO) for Magento 2 / Adobe Commerce.** Generates
 spec-compliant `llms.txt`, `llms-full.txt`, and JSONL files so ChatGPT,
 Claude, Gemini, Perplexity, and other LLM-powered crawlers can ingest your
 catalog efficiently.
 
-[![Magento](https://img.shields.io/badge/Magento-2.4.7%2B-orange)]()
-[![PHP](https://img.shields.io/badge/PHP-8.2%20%7C%208.3%20%7C%208.4-blue)]()
-[![License](https://img.shields.io/badge/license-MIT-green)]()
-[![Hyvä](https://img.shields.io/badge/Hyv%C3%A4-natively%20compatible-brightgreen)]()
-
-> **Current version: 4.3.0** — fixes an empty blockquote in the generated
+> **Current version: 4.3.3** — build fix: removed the PHPStan stub file
+> that `setup:di:compile` could load. No functional changes.
+>
+> **4.3.0** — fixes an empty blockquote in the generated
 > files, finishes the `Sitemap:` line in agents.md, and adds router integration
 > tests. No breaking changes.
 >
@@ -78,7 +85,6 @@ in their natural prose form rather than buried in product cards.
 This module produces that format for Magento, with care taken for the things
 Magento makes hard: multi-store layout, Page Builder content, CMS directive
 resolution, customer-group pricing, and very large catalogs.
-
 
 ### A note on the spec
 

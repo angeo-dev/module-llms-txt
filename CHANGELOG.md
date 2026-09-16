@@ -7,6 +7,65 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [4.3.3] — 2026-09-16
+
+Build and packaging release. Generated files do not change.
+
+### Fixed
+
+* **PHPStan stub file removed.** 4.3.2 shipped `stubs/magento-factories.php`,
+  which declares Magento factory classes for static analysis only.
+  `setup:di:compile` scans every `*.php` file in a module outside `Test/` and
+  can `require_once` it, so those declarations could reach compilation. The
+  file is gone: `bitexpert/phpstan-magento` generates the factories during
+  analysis, as in the Mage-OS modules. The single-process PHPStan setting that
+  came with the stubs is removed too.
+* CI runs PHPStan once, in its own job on PHP 8.2. On PHP 8.3+ PHPStan's
+  turbo extension breaks the factory generator in
+  `bitexpert/phpstan-magento` 0.43; the upstream fix (0.44.0) is not tagged yet.
+* **"Generate Now (Async)"** saves the cron schedule row through
+  `Magento\Cron\Model\ResourceModel\Schedule` instead of the deprecated
+  `AbstractModel::save()`. The PHPStan ignore rule for this is removed, so the
+  code passes `bitexpert/phpstan-magento` without local exceptions.
+* `etc/crontab.xml` points at the correct schema,
+  `urn:magento:module:Magento_Cron:etc/crontab.xsd`.
+
+### Changed
+
+* `magento/module-cron` moved from `require-dev` to `require`, and
+  `Magento_Cron` added to the module sequence. The module uses it at runtime
+  (cron job, cron group, schedule controller).
+* `Controller\Adminhtml\Generate\Schedule` takes an optional
+  `ScheduleResource` argument with an object-manager fallback, so its
+  constructor stays compatible with earlier 4.3.x releases.
+
+### Build
+
+- `.gitattributes` with `export-ignore`: the Composer package no longer
+  contains `Test/`, `phpstan.neon` and `phpunit.xml`.
+
+### Documentation
+
+- README: one badge row across the suite — CI, Packagist version and
+  downloads, PHP 8.1 – 8.5, supported Magento range, Mage-OS Extension
+  Directory, license.
+
+---
+
+## [4.3.2] — 2026-09-12
+
+Tooling release: GitHub Actions CI, PHPStan config with factory stubs,
+PHPUnit 10.5 config, and small code fixes found by static analysis.
+
+---
+
+## [4.3.1]
+
+* PHP 8.1 allowed again. Magento dependencies use caret ranges (`^103.0`
+  etc.) instead of open `>=` ranges.
+
+---
+
 ## [4.3.0] — 2026-09-08
 
 Loose ends. Three defects that were known and carried, plus the integration

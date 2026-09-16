@@ -45,13 +45,37 @@ jobs:
       - name: Lint PHP
         run: find . -path ./vendor -prune -o -name '*.php' -print0 | xargs -0 -n1 -P4 php -l
 
-      # stubs/ holds PHPStan-only class declarations (several classes per file
-      # on purpose), so it is not real module code and is not linted here.
       - name: Magento coding standard
-        run: vendor/bin/phpcs -n --standard=Magento2 --extensions=php,phtml --ignore='vendor/*,stubs/*' .
-
-      - name: Static analysis
-        run: vendor/bin/phpstan analyse --no-progress
+        run: vendor/bin/phpcs -n --standard=Magento2 --extensions=php,phtml --ignore='vendor/*' .
 
       - name: Unit tests
         run: vendor/bin/phpunit --configuration phpunit.xml
+
+  # PHPStan runs once, on one PHP version, as in the Mage-OS modules
+  # (mage-os-lab/module-blog). bitexpert/phpstan-magento generates the Magento
+  # factory classes during analysis, so no stub files are needed.
+  # PHP 8.2 on purpose: on PHP 8.3+ PHPStan loads its "turbo" extension, whose
+  # shared cache breaks the factory generator in bitexpert/phpstan-magento
+  # 0.43 ("Failed opening required '<?php ..."). The fix is merged upstream
+  # (0.44.0) but not tagged yet; move this job to 8.3 once it is released.
+  static:
+    name: PHPStan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: bcmath, ctype, curl, dom, gd, iconv, intl, json, mbstring, openssl, pdo_mysql, simplexml, soap, sockets, sodium, xsl, zip
+          coverage: none
+          tools: composer:v2
+
+      - name: Add Magento package mirror
+        run: composer config repositories.mage-os '{"type":"composer","url":"https://mirror.mage-os.org/","canonical":false}'
+
+      - name: Install dependencies
+        run: composer update --prefer-dist --no-progress --no-interaction
+
+      - name: PHPStan
+        run: vendor/bin/phpstan analyse --memory-limit=1G --no-progress
