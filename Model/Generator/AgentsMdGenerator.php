@@ -18,6 +18,7 @@ use Angeo\LlmsTxt\Model\Output\SurfaceRegistry;
 use Magento\Framework\App\Config\ScopeConfigInterface;
 use Magento\Framework\App\Filesystem\DirectoryList;
 use Magento\Framework\Filesystem;
+use Magento\Framework\UrlInterface;
 use Magento\Store\Api\Data\StoreInterface;
 use Magento\Store\Model\ScopeInterface;
 use Magento\Store\Model\Store;
@@ -136,7 +137,9 @@ class AgentsMdGenerator
 
     private function buildContext(StoreInterface $store): array
     {
-        $baseUrl = $store instanceof Store ? (string) $store->getBaseUrl() : '';
+        $baseUrl = $store instanceof Store
+            ? (string) $store->getBaseUrl(UrlInterface::URL_TYPE_LINK, $store->isFrontUrlSecure())
+            : '';
         $storeId = $store->getId();
 
         $summary = $this->config->getStoreSummary($store);

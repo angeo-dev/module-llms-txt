@@ -28,7 +28,13 @@ class OutputContextTest extends TestCase
     {
         $this->store = $this->createMock(Store::class);
         $this->store->method('getId')->willReturn(1);
-        $this->store->method('getBaseUrl')->with(UrlInterface::URL_TYPE_WEB)->willReturn('https://example.test/');
+        $this->store->method('isFrontUrlSecure')->willReturn(true);
+        $this->store->method('getBaseUrl')->willReturnCallback(
+            static fn (string $type = UrlInterface::URL_TYPE_LINK, ?bool $secure = null): string =>
+                $type === UrlInterface::URL_TYPE_LINK && $secure === true
+                    ? 'https://example.test/en/'
+                    : 'http://example.test/'
+        );
         $this->store->method('getCurrentCurrencyCode')->willReturn('USD');
 
         $this->scopeConfig = $this->createMock(ScopeConfigInterface::class);
@@ -77,7 +83,7 @@ class OutputContextTest extends TestCase
             $this->scopeConfig
         );
 
-        self::assertSame('https://example.test', $ctx->getBaseUrl());
+        self::assertSame('https://example.test/en', $ctx->getBaseUrl());
     }
 
     public function testSharedBag(): void

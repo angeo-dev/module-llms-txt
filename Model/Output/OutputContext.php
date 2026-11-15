@@ -90,9 +90,8 @@ class OutputContext implements OutputContextInterface
     public function getBaseUrl(): string
     {
         if ($this->baseUrl === null) {
-            // URL_TYPE_WEB → always frontend URL, even when called from cron/CLI.
             $this->baseUrl = rtrim(
-                (string) $this->store->getBaseUrl(UrlInterface::URL_TYPE_WEB),
+                (string) $this->store->getBaseUrl(UrlInterface::URL_TYPE_LINK, $this->store->isFrontUrlSecure()),
                 '/'
             );
         }
