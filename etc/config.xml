@@ -72,16 +72,5 @@
                 <schedule>0 2 * * *</schedule>
             </cron>
         </angeo_llms>
-        <crontab>
-            <default>
-                <jobs>
-                    <angeo_llms_generate>
-                        <schedule>
-                            <cron_expr>0 2 * * *</cron_expr>
-                        </schedule>
-                    </angeo_llms_generate>
-                </jobs>
-            </default>
-        </crontab>
     </default>
 </config>

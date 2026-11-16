@@ -113,7 +113,13 @@ class UrlResolver implements UrlResolverInterface
     {
         try {
             $store = $this->storeRepository->getById($storeId);
-            return rtrim((string) $store->getBaseUrl(\Magento\Framework\UrlInterface::URL_TYPE_WEB), '/');
+            return rtrim(
+                (string) $store->getBaseUrl(
+                    \Magento\Framework\UrlInterface::URL_TYPE_LINK,
+                    $store->isFrontUrlSecure()
+                ),
+                '/'
+            );
         } catch (\Throwable) {
             return '';
         }

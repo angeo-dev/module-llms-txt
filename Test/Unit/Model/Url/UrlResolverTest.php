@@ -13,6 +13,7 @@ use Angeo\LlmsTxt\Model\Url\UrlResolver;
 use Magento\Framework\App\ResourceConnection;
 use Magento\Framework\DB\Adapter\AdapterInterface;
 use Magento\Framework\DB\Select;
+use Magento\Framework\UrlInterface;
 use Magento\Store\Api\StoreRepositoryInterface;
 use Magento\Store\Model\Store;
 use PHPUnit\Framework\TestCase;
@@ -77,22 +78,28 @@ class UrlResolverTest extends TestCase
         $resource->method('getTableName')->willReturn('url_rewrite');
 
         $store = $this->createMock(Store::class);
-        $store->method('getBaseUrl')->willReturn('https://shop.test/');
+        $store->method('isFrontUrlSecure')->willReturn(true);
+        $store->method('getBaseUrl')->willReturnCallback(
+            static fn (string $type = UrlInterface::URL_TYPE_LINK, ?bool $secure = null): string =>
+                $type === UrlInterface::URL_TYPE_LINK && $secure === true
+                    ? 'https://shop.test/en/'
+                    : 'http://shop.test/'
+        );
         $repo = $this->createMock(StoreRepositoryInterface::class);
         $repo->method('getById')->willReturn($store);
 
         $resolver = new UrlResolver($resource, $repo);
 
         self::assertSame(
-            'https://shop.test/p1.html',
+            'https://shop.test/en/p1.html',
             $resolver->resolve(UrlResolverInterface::ENTITY_PRODUCT, 100, 1)
         );
         self::assertSame(
-            'https://shop.test/shoes.html',
+            'https://shop.test/en/shoes.html',
             $resolver->resolve(UrlResolverInterface::ENTITY_CATEGORY, 200, 1)
         );
         self::assertSame(
-            'https://shop.test/about',
+            'https://shop.test/en/about',
             $resolver->resolve(UrlResolverInterface::ENTITY_CMS_PAGE, 300, 1)
         );
 
@@ -122,7 +129,13 @@ class UrlResolverTest extends TestCase
         $resource->method('getTableName')->willReturn('url_rewrite');
 
         $store = $this->createMock(Store::class);
-        $store->method('getBaseUrl')->willReturn('https://shop.test/');
+        $store->method('isFrontUrlSecure')->willReturn(true);
+        $store->method('getBaseUrl')->willReturnCallback(
+            static fn (string $type = UrlInterface::URL_TYPE_LINK, ?bool $secure = null): string =>
+                $type === UrlInterface::URL_TYPE_LINK && $secure === true
+                    ? 'https://shop.test/'
+                    : 'http://shop.test/'
+        );
         $repo = $this->createMock(StoreRepositoryInterface::class);
         $repo->method('getById')->willReturn($store);
 
@@ -151,7 +164,13 @@ class UrlResolverTest extends TestCase
         $resource->method('getTableName')->willReturn('url_rewrite');
 
         $store = $this->createMock(Store::class);
-        $store->method('getBaseUrl')->willReturn('https://shop.test/');
+        $store->method('isFrontUrlSecure')->willReturn(true);
+        $store->method('getBaseUrl')->willReturnCallback(
+            static fn (string $type = UrlInterface::URL_TYPE_LINK, ?bool $secure = null): string =>
+                $type === UrlInterface::URL_TYPE_LINK && $secure === true
+                    ? 'https://shop.test/'
+                    : 'http://shop.test/'
+        );
         $repo = $this->createMock(StoreRepositoryInterface::class);
         $repo->method('getById')->willReturn($store);
 
