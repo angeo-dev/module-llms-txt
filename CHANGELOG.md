@@ -7,6 +7,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [4.4.0] — 2026-11-16
+
+Links in the generated files are now store-aware. Thanks to
+Łukasz Bajsarowicz for the fix (#9, closes #7 and #8).
+
+### Changed
+
+* **Store-aware secure links.** `llms.txt`, `llms-full.txt`, JSONL and
+  `agents.md` build links from the store's link base URL
+  (`URL_TYPE_LINK`) with the store's frontend secure flag. Before, they used
+  the web base URL. That URL never has the store code, and in CLI and cron it
+  could fall back to `http://`. Stores with "Add Store Code to URLs" enabled
+  now get links such as `https://shop.test/en/product.html`. Regenerate the
+  files after the upgrade. Changed in `UrlResolver`, `OutputContext` and
+  `AgentsMdGenerator`.
+
+### Fixed
+
+* **Phantom cron job removed.** `etc/config.xml` declared
+  `crontab/default/jobs/angeo_llms_generate`, but the real job lives in the
+  `angeo_llms` group (`etc/crontab.xml`). Magento registered a job without a
+  callback in the `default` group. The block is gone. The schedule still
+  comes from `angeo_llms/cron/schedule`.
+
+### Build
+
+* CI: `phpstan/phpstan` is pinned below 2.3 and `laminas/laminas-code` below
+  4.18 in `require-dev`. With PHPStan 2.3.6 and laminas-code 4.19.0,
+  `bitexpert/phpstan-magento` 0.43 no longer generated the Magento factory
+  classes, and PHPStan reported them as unknown. Dev-only change; the
+  package itself is not affected.
+
+### Tests
+
+* New `Test/Unit/Etc/ConfigXmlTest` checks that the cron job is declared only
+  in the dedicated group. URL tests cover the store code and the secure flag.
+
+---
+
 ## [4.3.3] — 2026-09-16
 
 Build and packaging release. Generated files do not change.

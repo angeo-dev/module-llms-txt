@@ -14,7 +14,11 @@ spec-compliant `llms.txt`, `llms-full.txt`, and JSONL files so ChatGPT,
 Claude, Gemini, Perplexity, and other LLM-powered crawlers can ingest your
 catalog efficiently.
 
-> **Current version: 4.3.3** — build fix: removed the PHPStan stub file
+> **Current version: 4.4.0** — links in the generated files now use the
+> store's link URL: they include the store code and always use https when the
+> store frontend is secure. Also removes a broken cron job entry.
+>
+> **4.3.3** — build fix: removed the PHPStan stub file
 > that `setup:di:compile` could load. No functional changes.
 >
 > **4.3.0** — fixes an empty blockquote in the generated
