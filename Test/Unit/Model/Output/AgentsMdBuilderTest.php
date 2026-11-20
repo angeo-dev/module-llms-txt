@@ -99,6 +99,22 @@ class AgentsMdBuilderTest extends TestCase
         self::assertSame('', $block->render('https://demo.example', []), 'no surfaces → empty string, no orphan heading');
     }
 
+    public function testUcpLinkUsesDomainRootWithStoreCode(): void
+    {
+        $ctx = $this->fullContext();
+        $ctx['base_url'] = 'https://demo.example/en/';
+        $md = $this->builder->build($ctx);
+
+        self::assertStringContainsString('https://demo.example/.well-known/ucp', $md);
+        self::assertStringNotContainsString('/en/.well-known/', $md);
+        self::assertStringContainsString('https://demo.example/en/llms.txt', $md);
+        self::assertStringContainsString('POST https://demo.example/en/mcp', $md);
+
+        $block = (new AgentSurfacesBlock())->render('https://demo.example/index.php/en/', ['agents_md' => true, 'ucp' => true]);
+        self::assertStringContainsString('(https://demo.example/.well-known/ucp)', $block);
+        self::assertStringContainsString('(https://demo.example/index.php/en/agents.md)', $block);
+    }
+
     public function testKeyPagesSectionRendersConfiguredLinks(): void
     {
         $md = $this->builder->build($this->fullContext());

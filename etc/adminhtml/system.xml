@@ -205,6 +205,13 @@
                     <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
                     <comment><![CDATA[Serves <code>/sitemap_agentic_discovery.xml</code>, a small sitemap that declares only the agent-facing files (agents.md, llms.txt, and the other enabled formats). Submit it in Search Console next to your main sitemap. Mirrors what Shopify publishes.]]></comment>
                 </field>
+
+                <field id="generate_ai_catalog" translate="label comment" type="select" sortOrder="65"
+                       showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Serve AI Catalog</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment><![CDATA[Serves <code>/.well-known/ai-catalog.json</code> (AI Catalog, draft 1.0) and adds <code>&lt;link rel="ai-catalog"&gt;</code> to every page. Agents read it to find this store's AI services before they connect. Other modules add their entries — for example <code>angeo/module-mcp-server</code> 2.5+ adds its MCP Server Card. With no entries nothing is published.]]></comment>
+                </field>
             </group>
 
             <!-- ─── Product data (4.0.0) ─── -->

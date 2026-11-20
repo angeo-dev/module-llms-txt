@@ -1,0 +1,13 @@
+<?php
+/**
+ * AI Catalog link relation (5.1.0). Plain <link>, works under Luma and Hyvä.
+ *
+ * @var \Angeo\LlmsTxt\Block\Head\AiCatalogLink $block
+ * @var \Magento\Framework\Escaper $escaper
+ */
+$url = $block->getCatalogUrl();
+if ($url === null) {
+    return;
+}
+?>
+<link rel="ai-catalog" type="application/ai-catalog+json" href="<?= $escaper->escapeUrl($url) ?>"/>

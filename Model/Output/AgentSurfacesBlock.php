@@ -8,6 +8,8 @@ declare(strict_types=1);
 
 namespace Angeo\LlmsTxt\Model\Output;
 
+use Angeo\LlmsTxt\Model\Url\Origin;
+
 /**
  * Renders the "For Agents & Developers" block appended to llms.txt —
  * mirroring the storefront convention Shopify's native llms.txt established:
@@ -34,7 +36,8 @@ class AgentSurfacesBlock
             $lines[] = sprintf('- [Agent guide](%s/agents.md): interaction rules and machine-readable surfaces', $baseUrl);
         }
         if (!empty($surfaces['ucp'])) {
-            $lines[] = sprintf('- [UCP profile](%s/.well-known/ucp): commerce capability discovery (Universal Commerce Protocol)', $baseUrl);
+            // /.well-known/ is at the domain root: no store code, no index.php.
+            $lines[] = sprintf('- [UCP profile](%s/.well-known/ucp): commerce capability discovery (Universal Commerce Protocol)', Origin::fromUrl($baseUrl));
         }
         if (!empty($surfaces['mcp'])) {
             $lines[] = sprintf('- [MCP endpoint](%s/mcp): live catalog access over Model Context Protocol (POST, JSON-RPC 2.0)', $baseUrl);

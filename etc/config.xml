@@ -34,6 +34,8 @@
                 <generate_md_mirror>0</generate_md_mirror>
                 <!-- llms.txt v2 (Aug 2026) discoverability + agentic sitemap. -->
                 <emit_link_relations>1</emit_link_relations>
+                <!-- 5.1.0: published only when another module adds an entry. -->
+                <generate_ai_catalog>1</generate_ai_catalog>
                 <link_to_md>1</link_to_md>
                 <generate_agentic_sitemap>1</generate_agentic_sitemap>
             </formats>

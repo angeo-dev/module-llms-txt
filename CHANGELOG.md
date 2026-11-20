@@ -7,6 +7,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [5.1.0] — 2026-11-09
+
+### Added
+
+* **AI Catalog** at `/.well-known/ai-catalog.json` (Agent-Card/ai-catalog,
+  specVersion 1.0, media type `application/ai-catalog+json`). The file lists
+  the agent endpoints of the store — for example the MCP Server Card from
+  Angeo_McpServer 2.5.0. The module only collects entries: other modules add
+  them through the new event `angeo_ai_catalog_collect`. No entries means no
+  file (404), so a store never publishes an empty catalog.
+* `<link rel="ai-catalog">` in the page head, only when the catalog is served.
+* Setting *Generate AI Catalog* (Stores → Configuration → Angeo → LLMs.txt),
+  on by default. The same Enable, Exclude, inactive store and Website
+  Restrictions checks as `llms.txt` apply.
+
+### Fixed
+
+* **UCP link at the domain root.** The "For Agents & Developers" block in
+  `llms.txt` and the "UCP profile" line in `agents.md` built
+  `/.well-known/ucp` from the store's link base URL. Since 5.0.0 that URL can
+  carry the store code or `index.php`, so the link became
+  `https://shop.test/en/.well-known/ucp`. `/.well-known/` lives at the domain
+  root (RFC 8615), so the link now uses the origin only:
+  `https://shop.test/.well-known/ucp`. Links to `agents.md`, `llms.txt` and
+  `/mcp` keep the store code. New helper `Model\Url\Origin`.
+
+### Notes
+
+* Entries are checked before output: `identifier` and `type` are required,
+  exactly one of `url` (HTTPS only) or `data`, unknown members are removed,
+  duplicates and anything past 50 entries are dropped.
+* AI Catalog is an Editor's Draft. The format may change; this module follows
+  the draft as of November 2026.
+
+### Documentation
+
+* README, *Multi-server setups*: which setups need a shared
+  `var/angeo/llms/` (web nodes that share only `pub/media`, containers
+  without a persistent `var/`, Remote Storage), how to fix it, and how to
+  check one node. Corrected the note on parallel runs: the generation lock is
+  shared through the database, so a second run on another node at the same
+  time skips the store instead of running in parallel.
+
+---
+
 ## [5.0.0] — 2026-10-26
 
 Security release after a full review. **Contains breaking changes** — see

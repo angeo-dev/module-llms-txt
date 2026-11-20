@@ -8,6 +8,8 @@ declare(strict_types=1);
 
 namespace Angeo\LlmsTxt\Model\Output;
 
+use Angeo\LlmsTxt\Model\Url\Origin;
+
 /**
  * Builds the agents.md document — an operator's manual addressed directly at
  * AI agents, following the storefront convention Shopify established in May
@@ -80,7 +82,8 @@ class AgentsMdBuilder
             $out[] = sprintf('- **Markdown mirrors:** append `.md` to a product or category URL path for a markdown rendition of that page (e.g. %s/example-product.md).', $baseUrl);
         }
         if (!empty($s['ucp'])) {
-            $out[] = sprintf('- **UCP profile:** %s/.well-known/ucp — Universal Commerce Protocol discovery manifest declaring this store\'s commerce capabilities and signing keys.', $baseUrl);
+            // /.well-known/ is at the domain root: no store code, no index.php.
+            $out[] = sprintf('- **UCP profile:** %s/.well-known/ucp — Universal Commerce Protocol discovery manifest declaring this store\'s commerce capabilities and signing keys.', Origin::fromUrl($baseUrl));
         }
         if (!empty($s['mcp'])) {
             $out[] = sprintf('- **MCP endpoint:** POST %s/mcp — Model Context Protocol server (JSON-RPC 2.0, Streamable HTTP). Live catalog search, product cards, categories and store info. Start with an `initialize` request; then `tools/list`.', $baseUrl);

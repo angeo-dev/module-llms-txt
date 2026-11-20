@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<!--
+  ~ Angeo LLMs.txt 5.1.0 — rel="ai-catalog" on every storefront page.
+  ~ head.additional is a block, hence referenceBlock (see catalog_product_view.xml).
+  ~
+  ~ @license MIT
+  -->
+<page xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:noNamespaceSchemaLocation="urn:magento:framework:View/Layout/etc/page_configuration.xsd">
+    <body>
+        <referenceBlock name="head.additional">
+            <block class="Angeo\LlmsTxt\Block\Head\AiCatalogLink"
+                   name="angeo.llms.ai.catalog.link"
+                   template="Angeo_LlmsTxt::head/ai_catalog_link.phtml"/>
+        </referenceBlock>
+    </body>
+</page>

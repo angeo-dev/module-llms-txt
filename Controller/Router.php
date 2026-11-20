@@ -9,6 +9,7 @@ declare(strict_types=1);
 namespace Angeo\LlmsTxt\Controller;
 
 use Angeo\LlmsTxt\Controller\Index\AgenticSitemap as AgenticSitemapController;
+use Angeo\LlmsTxt\Controller\Index\AiCatalog as AiCatalogController;
 use Angeo\LlmsTxt\Controller\Index\Index as IndexController;
 use Angeo\LlmsTxt\Controller\Index\MdMirror as MdMirrorController;
 use Angeo\LlmsTxt\Model\Config;
@@ -57,6 +58,9 @@ class Router implements RouterInterface
     /** @since 4.0.0 */
     private const AGENTIC_SITEMAP = 'sitemap_agentic_discovery.xml';
 
+    /** @since 5.1.0 */
+    private const AI_CATALOG = '.well-known/ai-catalog.json';
+
     private const FILE_ROUTES = [
         'llms.txt'        => true,
         'llms-full.txt'   => true,
@@ -91,6 +95,17 @@ class Router implements RouterInterface
         $tail = $lastSlash === false ? $path : substr($path, $lastSlash + 1);
 
         $isRoot = $lastSlash === false;
+
+        // 5.1.0: the AI Catalog lives under /.well-known/, at the domain root.
+        if ($path === self::AI_CATALOG) {
+            $request
+                ->setModuleName('llms')
+                ->setControllerName('index')
+                ->setActionName('aicatalog')
+                ->setDispatched(true);
+
+            return $this->actionFactory->create(AiCatalogController::class);
+        }
 
         if ($isRoot && $tail === self::AGENTIC_SITEMAP) {
             $request

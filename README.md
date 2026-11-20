@@ -437,6 +437,32 @@ in `di.xml`.
 
 ---
 
+## AI Catalog (5.1.0)
+
+`/.well-known/ai-catalog.json` tells AI agents which agent endpoints the store
+has. It follows the AI Catalog draft (github.com/Agent-Card/ai-catalog).
+
+The module does not invent entries. Other modules add them through the event
+`angeo_ai_catalog_collect` (arguments: `store`, and `catalog` — a DataObject
+with an `entries` array). Angeo_McpServer 2.5.0 adds its MCP Server Card.
+
+```php
+public function execute(\Magento\Framework\Event\Observer $observer): void
+{
+    $catalog = $observer->getEvent()->getData('catalog');
+    $entries = (array) $catalog->getData('entries');
+    $entries[] = [
+        'identifier' => 'urn:air:shop.example.com:mcp:mcp',
+        'type' => 'application/mcp-server-card+json',
+        'url' => 'https://shop.example.com/mcp/server-card',
+    ];
+    $catalog->setData('entries', $entries);
+}
+```
+
+With no entries the URL answers 404 and no `<link rel="ai-catalog">` is added.
+Turn it off with *Generate AI Catalog* = No.
+
 ## Events
 
 Hook in via observers — three events are dispatched per store/format pass:
@@ -486,11 +512,35 @@ only if the whole enabled, visible catalog with its prices may be public.
 
 ### Multi-server setups
 
-Generation writes to the local `var/` of the node that runs cron. If web
-nodes do not share `var/` (NFS, a shared mount, Adobe Commerce Cloud's `var`
-mount), run `bin/magento angeo:llms:generate` on every web node, or share
-`var/angeo/llms/`. Locking uses Magento's lock manager (database by default),
-so parallel runs on different nodes do not collide.
+Generated files live in `var/angeo/llms/` on the node that ran the
+generation. The module does not copy them to other nodes. The generation
+status (`var/angeo_llms/status.json`) is local too, so the admin status panel
+shows the node you are logged in on.
+
+**No action needed** on a single server, on Adobe Commerce Cloud (`var` is a
+shared mount on all nodes), or when the whole `var/` is on a shared mount.
+
+**Check your setup** in these cases:
+
+| Setup | What happens |
+|---|---|
+| Several web nodes, only `pub/media` (and `pub/static`) on NFS | Only the cron node has the files. Requests that reach other nodes get `404 Not generated yet`. |
+| Containers / Kubernetes, `var/` not on a persistent volume | Each pod has its own empty `var/`. Files are lost on every deploy or restart, until the next cron run on that pod. |
+| Remote Storage (S3) | Remote Storage covers `pub/media` and `var/import_export` only. `var/angeo/llms/` stays on the local disk. |
+
+**Fix** — pick one:
+
+* Share `var/angeo/llms/` between all web nodes (NFS mount, persistent
+  volume, symlink to a shared path). This is the simplest fix.
+* Or run `bin/magento angeo:llms:generate` on every web node after each
+  deploy and on a schedule. Run the nodes **one after another**, not at the
+  same time: the generation lock is shared through the database, so a second
+  run for the same store while the first is still running skips that store
+  ("already running") and that node stays without files.
+
+To check a node, call `/llms.txt` on it directly (by its IP or host name, not
+through the load balancer). `404 Not generated yet` means that node has no
+file.
 
 ---
 

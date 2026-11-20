@@ -31,7 +31,7 @@ class Config
      *
      * @since 3.3.0
      */
-    public const MODULE_VERSION = '5.0.0';
+    public const MODULE_VERSION = '5.1.0';
 
     /**
      * Attribute codes never exported, whatever the configuration says:
@@ -66,6 +66,8 @@ class Config
     public const XML_PATH_LINK_RELATIONS     = 'angeo_llms/formats/emit_link_relations';
     public const XML_PATH_LINK_TO_MD         = 'angeo_llms/formats/link_to_md';
     public const XML_PATH_AGENTIC_SITEMAP    = 'angeo_llms/formats/generate_agentic_sitemap';
+    /** @since 5.1.0 */
+    public const XML_PATH_AI_CATALOG         = 'angeo_llms/formats/generate_ai_catalog';
 
     // ─── Product data (4.0.0) ──────────────────────────────────────────────
     public const XML_PATH_PD_ATTRIBUTES      = 'angeo_llms/product_data/export_attributes';
@@ -430,6 +432,16 @@ class Config
      *
      * @since 4.0.0
      */
+    /** /.well-known/ai-catalog.json and its rel="ai-catalog" link. @since 5.1.0 */
+    public function isAiCatalogEnabled(StoreInterface $store): bool
+    {
+        return $this->scopeConfig->isSetFlag(
+            self::XML_PATH_AI_CATALOG,
+            ScopeInterface::SCOPE_STORE,
+            $store->getId()
+        );
+    }
+
     public function isAgenticSitemapEnabled(StoreInterface $store): bool
     {
         return $this->scopeConfig->isSetFlag(
