@@ -33,7 +33,6 @@ class GenerateCommand extends Command
 
     public function __construct(
         private readonly GenerationService $generationService,
-        private readonly Config $config,
         private readonly State $appState
     ) {
         parent::__construct();
@@ -63,10 +62,8 @@ class GenerateCommand extends Command
         $output->writeln('<info>Angeo LLMs.txt Generator ' . Config::MODULE_VERSION . '</info>');
         $output->writeln('');
 
-        if (!$this->config->isEnabled()) {
-            $output->writeln('<comment>Module is disabled in Stores → Configuration → Angeo → LLMs.txt</comment>');
-            return Command::SUCCESS;
-        }
+        // Enable is checked per store by the pipeline (5.0.0). Disabled stores
+        // are listed as skipped and their files are removed.
 
         $storeCode = $input->getOption(self::OPT_STORE) ?: null;
         $skip = [

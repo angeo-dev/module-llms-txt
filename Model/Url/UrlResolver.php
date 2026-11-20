@@ -53,7 +53,11 @@ class UrlResolver implements UrlResolverInterface
         $connection = $this->resourceConnection->getConnection();
         $tableName  = $this->resourceConnection->getTableName('url_rewrite');
 
-        // One query, all entity types, redirect_type=0 (current canonical URL only).
+        // One query, all entity types, redirect_type=0 (current URL only).
+        // 5.0.0: metadata IS NULL keeps only the canonical rewrite. Without it
+        // product rows also included every category-path variant
+        // (women/tops/shirt.html) and, with no ORDER BY, which one "won"
+        // changed from run to run — and the whole set was held in memory.
         $select = $connection->select()
             ->from(
                 $tableName,
@@ -61,7 +65,9 @@ class UrlResolver implements UrlResolverInterface
             )
             ->where('store_id = ?', $storeId)
             ->where('entity_type IN (?)', array_values(self::ENTITY_TO_REWRITE))
-            ->where('redirect_type = ?', 0);
+            ->where('redirect_type = ?', 0)
+            ->where('metadata IS NULL')
+            ->order('url_rewrite_id ASC');
 
         $bucket = [
             UrlResolverInterface::ENTITY_PRODUCT  => [],
@@ -113,13 +119,7 @@ class UrlResolver implements UrlResolverInterface
     {
         try {
             $store = $this->storeRepository->getById($storeId);
-            return rtrim(
-                (string) $store->getBaseUrl(
-                    \Magento\Framework\UrlInterface::URL_TYPE_LINK,
-                    $store->isFrontUrlSecure()
-                ),
-                '/'
-            );
+            return rtrim(\Angeo\LlmsTxt\Model\Output\OutputContext::storefrontBaseUrl($store), '/');
         } catch (\Throwable) {
             return '';
         }

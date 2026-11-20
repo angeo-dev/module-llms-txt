@@ -7,42 +7,116 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [4.4.0] — 2026-11-16
+## [5.0.0] — 2026-10-26
 
-Links in the generated files are now store-aware. Thanks to
-Łukasz Bajsarowicz for the fix (#9, closes #7 and #8).
+Security release after a full review. **Contains breaking changes** — see
+*Upgrade notes* at the end of this entry and in the README.
 
-### Changed
+### Security
 
-* **Store-aware secure links.** `llms.txt`, `llms-full.txt`, JSONL and
-  `agents.md` build links from the store's link base URL
-  (`URL_TYPE_LINK`) with the store's frontend secure flag. Before, they used
-  the web base URL. That URL never has the store code, and in CLI and cron it
-  could fall back to `http://`. Stores with "Add Store Code to URLs" enabled
-  now get links such as `https://shop.test/en/product.html`. Regenerate the
-  files after the upgrade. Changed in `UrlResolver`, `OutputContext` and
-  `AgentsMdGenerator`.
+* **Generated files are no longer public under `/media/`.** They moved from
+  `pub/media/angeo/llms/` to `var/angeo/llms/`. The web server served the old
+  location directly, which bypassed every check the controller makes (Enable,
+  Exclude, inactive store, Website Restrictions) and kept the files online
+  after the module was disabled. A data patch, every generation run and
+  `angeo:llms:clean` delete the old copies (`LegacyOutputCleaner`).
+* **Restricted catalogs are not published by default.** New
+  `RestrictedCatalogGuard`: when Catalog Permissions, B2B Shared Catalog or
+  Website Restrictions are active for a store, nothing is generated or served
+  for it (files, `.md` mirrors, agents.md, agentic sitemap, `<link>` tags)
+  unless the new setting *Publish Even With Catalog Access Rules* is Yes.
+  The `composer.json` suggestion that claimed Shared Catalog integration is
+  removed — the module never implemented it.
+* **Markdown injection from catalog text.** New `Model\Text\MarkdownText`.
+  In llms.txt, llms-full.txt and `.md` mirrors, links inside descriptions
+  (including `javascript:` URLs and autolinks) become plain text, lines that
+  would start a heading, quote, fence or rule are escaped, names and
+  single-line values are folded to one line, and the backslash is escaped.
+  JSONL is unchanged.
+* **`.md` mirror price currency / cache poisoning.** Prices were labelled with
+  the visitor's display currency and cached for everyone. They are now
+  labelled with the base currency they are stored in.
+* **Direct route closed.** `/llms/index/{index,mdmirror,agenticsitemap}` no
+  longer serve anything: the controllers read the file or page from the URL
+  path, never from a request parameter. `etc/frontend/routes.xml` is kept.
+* **Mirror negative cache removed.** Caching every unknown path let a sweep
+  of random URLs fill the cache backend.
+* Discovery files match only at the store root (was: any path ending in
+  `/llms.txt`, giving unlimited duplicate URLs and cache entries).
+* Admin scripts are emitted through `SecureHtmlRenderer` (CSP nonce); all
+  translated strings in admin templates are escaped.
+* The module version is no longer printed in the public signature.
+* The `cost` attribute is never exported (`Config::EXPORT_ATTRIBUTE_DENYLIST`).
+* `HtmlFilter` and `Sanitizer`: the sanitizer fails closed — if a filter
+  throws, remaining tags are stripped before the text can reach a file.
 
 ### Fixed
 
-* **Phantom cron job removed.** `etc/config.xml` declared
-  `crontab/default/jobs/angeo_llms_generate`, but the real job lives in the
-  `angeo_llms` group (`etc/crontab.xml`). Magento registered a job without a
-  callback in the `default` group. The block is gone. The schedule still
-  comes from `angeo_llms/cron/schedule`.
+* **Locking.** Per-store locks use `LockManagerInterface` (database lock by
+  default) instead of `flock()` on a file. A run that cannot get the lock is
+  skipped quietly; before, it deleted the lock of the running process,
+  recorded a failure and fired `angeo_llms_generation_failed`.
+* **Partial files published as success.** If an entity provider throws, the
+  store's run now fails and the previous file stays in place.
+* A format that renders to 0 bytes now also removes the previous file.
+* **Enable is store-scoped.** The global check read the default store view
+  only, so a per-store Enable was ignored. Disabled stores now get their
+  files deleted.
+* **Store URLs.** Base URL uses `URL_TYPE_LINK` (includes the store code with
+  *Add Store Code to URLs*) and the store's own secure setting (cron/CLI
+  produced `http://`). Same for product image URLs and agents.md.
+  Also reported and fixed by Łukasz Bajsarowicz (#7, #9).
+* **Canonical product URLs.** `UrlResolver` selects only rewrites with
+  `metadata IS NULL`, ordered by id. Category-path URLs could win at random
+  and the full rewrite table was held in memory.
+* `.md` mirror finds categories with a `/` URL suffix; `<link rel="alternate">`
+  no longer doubles the store code (`/de/de/…`).
+* **CMS mirror invalidation never worked.** CMS pages arrive in
+  `cms_page_*` events under `object` / `data_object`, not `page`. The observer
+  now resolves entities by type and clears every path form (`page.html`,
+  `page`). Mirror cache entries also carry `cat_p_<id>` / `cat_c_<id>` /
+  `cms_p_<id>` tags and responses send `X-Magento-Tags` for Varnish/Fastly.
+* **Deleted entities stayed in the files** with *skip unchanged* on:
+  `ChangeMarker` records deletes where `ChangeDetector` sees them.
+* `HtmlFilter` no longer deletes text such as `&lt;3 years`.
+* The CMS mirror checks that the page is still assigned to the store view.
+* Conditional GET: `If-None-Match` takes precedence over `If-Modified-Since`
+  (RFC 9110), lists and weak ETags are understood.
+* Cron expression is validated on save. The unused
+  `crontab/default/jobs/angeo_llms_generate` default in `config.xml` is
+  removed (the job lives in the `angeo_llms` group). Also reported and fixed
+  by Łukasz Bajsarowicz (#8, #9); his `Test/Unit/Etc/ConfigXmlTest` keeps it
+  that way.
+* HTTP cache TTL is validated (60–604800).
+* `Schedule` controller no longer uses `ObjectManager`.
 
-### Build
+### Changed
 
-* CI: `phpstan/phpstan` is pinned below 2.3 and `laminas/laminas-code` below
+* `composer.json`: `version` field removed (Packagist takes it from the tag).
+* CI: actions pinned to commit SHAs, `permissions: contents: read`,
+  non-blocking `composer audit`.
+* Tests: 73 → 126 unit tests; line coverage 14 % → 30 %. `UrlResolverTest`
+  now covers the store code and the secure flag (from #9).
+* CI: `phpstan/phpstan` pinned below 2.3 and `laminas/laminas-code` below
   4.18 in `require-dev`. With PHPStan 2.3.6 and laminas-code 4.19.0,
-  `bitexpert/phpstan-magento` 0.43 no longer generated the Magento factory
-  classes, and PHPStan reported them as unknown. Dev-only change; the
-  package itself is not affected.
+  `bitexpert/phpstan-magento` 0.43 no longer generated Magento factory
+  classes. Dev-only; the package is not affected.
 
-### Tests
+### Upgrade notes
 
-* New `Test/Unit/Etc/ConfigXmlTest` checks that the cron job is declared only
-  in the dedicated group. URL tests cover the store code and the secure flag.
+* Run `setup:upgrade`, then `angeo:llms:generate --force` (or wait for cron).
+  Discovery URLs return 404 until the first run writes to `var/`.
+* Remove anything that read `/media/angeo/llms/…` directly.
+* B2B / restricted stores: set *Publish Even With Catalog Access Rules* if
+  publishing is intended.
+* Multi-node without shared `var/`: generate on every web node.
+* New required constructor arguments (DI users are not affected):
+  `SinglePassGenerator` (`LockManagerInterface`, `LegacyOutputCleaner`,
+  `RestrictedCatalogGuard`), `AgentsMdGenerator`, `Index`, `MdMirror`,
+  `AgenticSitemap`, `LinkRelations` (`RestrictedCatalogGuard`),
+  `InvalidateMdMirrorCache` (`ChangeMarker`), `CleanCommand`
+  (`LegacyOutputCleaner`), `Schedule` (`ScheduleResource` now required).
+  `GenerateCommand` and `Cron\GenerateLlmsFiles` no longer take `Config`.
 
 ---
 

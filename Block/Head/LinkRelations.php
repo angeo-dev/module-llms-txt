@@ -8,6 +8,7 @@ declare(strict_types=1);
 
 namespace Angeo\LlmsTxt\Block\Head;
 
+use Angeo\LlmsTxt\Model\Access\RestrictedCatalogGuard;
 use Angeo\LlmsTxt\Model\Config;
 use Angeo\LlmsTxt\Model\Output\MarkdownUrl;
 use Magento\Framework\View\Element\Template;
@@ -42,6 +43,7 @@ class LinkRelations extends Template
         private readonly Config $config,
         private readonly StoreManagerInterface $storeManager,
         private readonly MarkdownUrl $markdownUrl,
+        private readonly RestrictedCatalogGuard $restrictedGuard,
         array $data = []
     ) {
         parent::__construct($context, $data);
@@ -53,6 +55,24 @@ class LinkRelations extends Template
     public function getMarkdownUrl(): ?string
     {
         $path = trim((string) $this->_request->getOriginalPathInfo(), '/');
+        if ($path === '') {
+            return null;
+        }
+
+        // 5.0.0: the original path info can still start with the store code
+        // ("de/shirt.html"), and the base URL already ends with it
+        // (".../de/"). Drop it once so the link is not ".../de/de/shirt.html.md".
+        try {
+            $store = $this->storeManager->getStore();
+            if (method_exists($store, 'isUseStoreInUrl') && $store->isUseStoreInUrl()) {
+                $prefix = $store->getCode() . '/';
+                if (str_starts_with($path, $prefix)) {
+                    $path = substr($path, strlen($prefix));
+                }
+            }
+        } catch (\Throwable) {
+            // keep the path as-is
+        }
         if ($path === '') {
             return null;
         }
@@ -81,6 +101,7 @@ class LinkRelations extends Template
             || $this->config->isStoreExcluded($store)
             || !$this->config->isMdMirrorEnabled($store)
             || !$this->config->isLinkRelationsEnabled($store)
+            || $this->restrictedGuard->isBlocked($store)
         ) {
             return '';
         }

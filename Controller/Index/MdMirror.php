@@ -10,9 +10,10 @@ namespace Angeo\LlmsTxt\Controller\Index;
 
 use Angeo\LlmsTxt\Api\OutputContextInterface;
 use Angeo\LlmsTxt\Api\SanitizerInterface;
-use Angeo\LlmsTxt\Controller\Router;
+use Angeo\LlmsTxt\Model\Access\RestrictedCatalogGuard;
 use Angeo\LlmsTxt\Model\Config;
 use Angeo\LlmsTxt\Model\Output\OutputContextFactory;
+use Angeo\LlmsTxt\Model\Text\MarkdownText;
 use Magento\Catalog\Api\CategoryRepositoryInterface;
 use Magento\Catalog\Api\ProductRepositoryInterface;
 use Magento\Catalog\Model\Product\Attribute\Source\Status as ProductStatus;
@@ -47,8 +48,15 @@ use Psr\Log\LoggerInterface;
  *  - Rendered markdown is cached in the Magento cache (TTL = HTTP cache TTL)
  *    so repeated crawls do not re-trigger entity loads, CMS directive
  *    resolution, and DOM-based sanitization on every request (DoS fix).
- *  - Misses (unknown paths) are negative-cached for a short window to blunt
- *    enumeration sweeps.
+ *  - 5.0.0: misses are NOT cached any more. Negative caching let a sweep of
+ *    random paths fill the cache backend with one entry per request.
+ *  - 5.0.0: the path is read from the request URL, never from a parameter,
+ *    so the standard-router route (/llms/index/mdmirror?md_path=…) serves
+ *    nothing.
+ *  - 5.0.0: prices are labelled with the base currency they are stored in
+ *    (was: the visitor's display currency, cached for everyone).
+ *  - 5.0.0: catalog text is markdown-escaped ({@see MarkdownText}) and the
+ *    response carries X-Magento-Tags so Varnish purges it on entity save.
  *  - `X-Content-Type-Options: nosniff` and `Content-Length` are always sent.
  *
  * @since 3.0.0
@@ -58,11 +66,8 @@ class MdMirror implements ActionInterface, HttpGetActionInterface
     /** Cache tag for all rendered mirrors — flushed via standard cache:clean. */
     public const CACHE_TAG = 'ANGEO_LLMS_MD';
 
-    /** Negative-cache lifetime for unknown paths (seconds). */
-    private const NOT_FOUND_TTL = 300;
-
-    /** Sentinel stored in cache for known-missing paths. */
-    private const NOT_FOUND_SENTINEL = "\0ANGEO_LLMS_404\0";
+    /** Separates cached tags from the cached body. */
+    private const TAGS_SEPARATOR = "\0";
 
     /** Upper bound for a cacheable request path; longer paths are rejected outright. */
     private const MAX_PATH_LENGTH = 1024;
@@ -81,11 +86,16 @@ class MdMirror implements ActionInterface, HttpGetActionInterface
         private readonly OutputContextFactory $contextFactory,
         private readonly CacheInterface $cache,
         private readonly LoggerInterface $logger,
+        private readonly RestrictedCatalogGuard $restrictedGuard,
         ?\Angeo\LlmsTxt\Model\Output\Signature $signature = null,
         private readonly ?\Angeo\LlmsTxt\Model\Cache\MdMirrorCacheKey $mdCacheKey = null
     ) {
         $this->signature = $signature ?? new \Angeo\LlmsTxt\Model\Output\Signature();
+        $this->markdown = new MarkdownText();
     }
+
+    /** @since 5.0.0 */
+    private readonly MarkdownText $markdown;
 
     /** @since 3.3.0 */
     private readonly \Angeo\LlmsTxt\Model\Output\Signature $signature;
@@ -99,11 +109,12 @@ class MdMirror implements ActionInterface, HttpGetActionInterface
                 !$this->config->isEnabled($store)
                 || $this->config->isStoreExcluded($store)
                 || !$this->config->isMdMirrorEnabled($store)
+                || $this->restrictedGuard->isBlocked($store)
             ) {
                 return $this->notFound();
             }
 
-            $path = (string) $this->request->getParam(Router::PARAM_MD_PATH);
+            $path = trim((string) $this->request->getPathInfo(), '/');
             if (
                 $path === ''
                 || strlen($path) > self::MAX_PATH_LENGTH
@@ -116,30 +127,22 @@ class MdMirror implements ActionInterface, HttpGetActionInterface
             $requestPath = substr($path, 0, -3);
             $requestPath = ltrim($requestPath, '/');
 
-            // ── Cache lookup (positive + negative) ──────────────────────────
-            $cacheKey = $this->buildCacheKey((int) $store->getId(), $requestPath);
-            $cached   = $this->cache->load($cacheKey);
-            if ($cached !== false && $cached !== '') {
-                if ($cached === self::NOT_FOUND_SENTINEL) {
-                    return $this->notFound();
-                }
-                return $this->buildResult($cached, $store);
+            if ($requestPath === '') {
+                return $this->notFound();
             }
 
-            $rewrite = $this->urlFinder->findOneByData([
-                UrlRewrite::REQUEST_PATH => $requestPath,
-                UrlRewrite::STORE_ID     => (int) $store->getId(),
-            ]);
-            if ($rewrite === null) {
-                // Fall back to the ".html"-suffixed rewrite; many catalogs index
-                // product/category rewrites with a configured ".html" URL suffix.
-                $rewrite = $this->urlFinder->findOneByData([
-                    UrlRewrite::REQUEST_PATH => $requestPath . '.html',
-                    UrlRewrite::STORE_ID     => (int) $store->getId(),
-                ]);
+            // ── Cache lookup (hits only; misses are never cached) ──────────
+            $cacheKey = $this->buildCacheKey((int) $store->getId(), $requestPath);
+            $cached   = $this->cache->load($cacheKey);
+            if (is_string($cached) && str_contains($cached, self::TAGS_SEPARATOR)) {
+                [$tags, $body] = explode(self::TAGS_SEPARATOR, $cached, 2);
+                if ($body !== '') {
+                    return $this->buildResult($body, $store, $tags);
+                }
             }
-            if ($rewrite === null || $rewrite->getRedirectType() !== 0) {
-                $this->rememberNotFound($cacheKey);
+
+            $rewrite = $this->findRewrite($requestPath, (int) $store->getId());
+            if ($rewrite === null) {
                 return $this->notFound();
             }
 
@@ -153,9 +156,9 @@ class MdMirror implements ActionInterface, HttpGetActionInterface
             if ($markdown === null) {
                 // Entity is disabled / hidden / gone — treat exactly like an
                 // unknown path so the response does not confirm its existence.
-                $this->rememberNotFound($cacheKey);
                 return $this->notFound();
             }
+            $tags = $this->entityTag($rewrite);
 
             // Attribution signature — appended BEFORE caching so the cached
             // copy and a fresh render are byte-identical (Content-Length is
@@ -165,13 +168,16 @@ class MdMirror implements ActionInterface, HttpGetActionInterface
             }
 
             $this->cache->save(
-                $markdown,
+                $tags . self::TAGS_SEPARATOR . $markdown,
                 $cacheKey,
-                [self::CACHE_TAG],
+                // Entity tag too: Magento cleans cat_p_<id> / cat_c_<id> /
+                // cms_p_<id> on save and delete, even when the rewrite rows
+                // are already gone.
+                array_values(array_filter([self::CACHE_TAG, $tags])),
                 $this->config->getHttpCacheTtl()
             );
 
-            return $this->buildResult($markdown, $store);
+            return $this->buildResult($markdown, $store, $tags);
         } catch (\Throwable $e) {
             $this->logger->error('[Angeo LlmsTxt] MdMirror error: ' . $e->getMessage(), [
                 'exception' => $e,
@@ -180,10 +186,53 @@ class MdMirror implements ActionInterface, HttpGetActionInterface
         }
     }
 
-    private function buildResult(string $markdown, ?\Magento\Store\Api\Data\StoreInterface $store = null): Raw
+    /**
+     * Resolve the request path to a canonical (non-redirect) rewrite.
+     *
+     * Tries the path as given, then with ".html" (the /page.md form of
+     * /page.html) and with "/" (categories configured with a slash suffix).
+     */
+    private function findRewrite(string $requestPath, int $storeId): ?UrlRewrite
     {
+        foreach ([$requestPath, $requestPath . '.html', $requestPath . '/'] as $candidate) {
+            $rewrite = $this->urlFinder->findOneByData([
+                UrlRewrite::REQUEST_PATH => $candidate,
+                UrlRewrite::STORE_ID     => $storeId,
+            ]);
+            if ($rewrite !== null) {
+                return (int) $rewrite->getRedirectType() === 0 ? $rewrite : null;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Full-page-cache tag of the entity, so Varnish/Fastly purge the mirror
+     * together with the HTML page when the entity is saved.
+     */
+    private function entityTag(UrlRewrite $rewrite): string
+    {
+        $prefix = match ($rewrite->getEntityType()) {
+            'product'  => 'cat_p_',
+            'category' => 'cat_c_',
+            'cms-page' => 'cms_p_',
+            default    => null,
+        };
+
+        return $prefix === null ? '' : $prefix . (int) $rewrite->getEntityId();
+    }
+
+    private function buildResult(
+        string $markdown,
+        ?\Magento\Store\Api\Data\StoreInterface $store = null,
+        string $tags = ''
+    ): Raw {
         $result = $this->resultRawFactory->create();
         $result->setHeader('Content-Type', 'text/markdown; charset=utf-8', true);
+        if ($tags !== '') {
+            $result->setHeader('X-Magento-Tags', $tags, true);
+        }
         // llms.txt v2: the Link: header form works for non-HTML resources, so
         // an agent that fetched the mirror directly can still find the
         // llms.txt covering it without going back to the HTML page.
@@ -211,16 +260,6 @@ class MdMirror implements ActionInterface, HttpGetActionInterface
         // compute the same key. Kept nullable for BC with manual instantiation.
         return ($this->mdCacheKey ?? new \Angeo\LlmsTxt\Model\Cache\MdMirrorCacheKey())
             ->forPath($storeId, $requestPath);
-    }
-
-    private function rememberNotFound(string $cacheKey): void
-    {
-        $this->cache->save(
-            self::NOT_FOUND_SENTINEL,
-            $cacheKey,
-            [self::CACHE_TAG],
-            self::NOT_FOUND_TTL
-        );
     }
 
     private function renderEntity(UrlRewrite $rewrite, OutputContextInterface $context): ?string
@@ -263,16 +302,20 @@ class MdMirror implements ActionInterface, HttpGetActionInterface
 
         $context->setShared(OutputContextInterface::SHARED_ENTITY_TYPE, 'product');
 
-        $title = (string) $product->getName();
-        $short = $this->sanitizer->sanitize((string) $product->getShortDescription(), $context);
-        $desc  = $this->sanitizer->sanitize((string) $product->getDescription(), $context);
+        $title = $this->markdown->inline((string) $product->getName());
+        $short = $this->markdown->block(
+            $this->sanitizer->sanitize((string) $product->getShortDescription(), $context)
+        );
+        $desc  = $this->markdown->block(
+            $this->sanitizer->sanitize((string) $product->getDescription(), $context)
+        );
         $product->setCustomerGroupId($context->getCustomerGroupId());
         $price = (float) $product->getFinalPrice();
 
         $out = "# {$title}\n\n";
         $out .= sprintf(
             "> SKU: %s · Price: %s %s\n\n",
-            $product->getSku(),
+            $this->markdown->inline((string) $product->getSku()),
             number_format($price, 2, '.', ''),
             $context->getCurrencyCode()
         );
@@ -300,8 +343,10 @@ class MdMirror implements ActionInterface, HttpGetActionInterface
 
         $context->setShared(OutputContextInterface::SHARED_ENTITY_TYPE, 'category');
 
-        $title = (string) $category->getName();
-        $desc  = $this->sanitizer->sanitize((string) $category->getDescription(), $context);
+        $title = $this->markdown->inline((string) $category->getName());
+        $desc  = $this->markdown->block(
+            $this->sanitizer->sanitize((string) $category->getDescription(), $context)
+        );
 
         $out = "# {$title}\n\n";
         if ($desc !== '') {
@@ -322,11 +367,21 @@ class MdMirror implements ActionInterface, HttpGetActionInterface
         if (!(bool) $page->isActive()) {
             return null;
         }
+        // Nor pages that are no longer assigned to this store view (a stale
+        // rewrite can outlive the assignment). 0 = all store views.
+        $raw      = $page instanceof \Magento\Framework\DataObject ? $page->getData('store_id') : null;
+        $assigned = array_map('intval', (array) ($raw ?? []));
+        $storeId  = (int) $context->getStore()->getId();
+        if ($assigned !== [] && !in_array(0, $assigned, true) && !in_array($storeId, $assigned, true)) {
+            return null;
+        }
 
         $context->setShared(OutputContextInterface::SHARED_ENTITY_TYPE, 'cms-page');
 
-        $title   = (string) $page->getTitle();
-        $content = $this->sanitizer->sanitize((string) $page->getContent(), $context);
+        $title   = $this->markdown->inline((string) $page->getTitle());
+        $content = $this->markdown->block(
+            $this->sanitizer->sanitize((string) $page->getContent(), $context)
+        );
 
         $out = "# {$title}\n\n";
         if ($content !== '') {

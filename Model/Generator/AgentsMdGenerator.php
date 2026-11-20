@@ -10,15 +10,14 @@ namespace Angeo\LlmsTxt\Model\Generator;
 
 use Angeo\LlmsTxt\Api\GenerationStatusRepositoryInterface;
 use Angeo\LlmsTxt\Api\OutputContextInterface;
+use Angeo\LlmsTxt\Model\Access\RestrictedCatalogGuard;
 use Angeo\LlmsTxt\Model\Config;
 use Angeo\LlmsTxt\Model\Output\AgentsMdBuilder;
 use Angeo\LlmsTxt\Model\Output\FilePathResolver;
 use Angeo\LlmsTxt\Model\Output\Signature;
 use Angeo\LlmsTxt\Model\Output\SurfaceRegistry;
 use Magento\Framework\App\Config\ScopeConfigInterface;
-use Magento\Framework\App\Filesystem\DirectoryList;
 use Magento\Framework\Filesystem;
-use Magento\Framework\UrlInterface;
 use Magento\Store\Api\Data\StoreInterface;
 use Magento\Store\Model\ScopeInterface;
 use Magento\Store\Model\Store;
@@ -54,6 +53,7 @@ class AgentsMdGenerator
         private readonly GenerationStatusRepositoryInterface $statusRepository,
         private readonly ScopeConfigInterface $scopeConfig,
         private readonly LoggerInterface $logger,
+        private readonly RestrictedCatalogGuard $restrictedGuard,
         private readonly ?\Angeo\LlmsTxt\Model\Output\SitemapUrlResolver $sitemapUrlResolver = null
     ) {
     }
@@ -66,15 +66,12 @@ class AgentsMdGenerator
     public function generateAll(?string $storeCode = null): array
     {
         $outcomes = [];
-        if (!$this->config->isEnabled()) {
-            return $outcomes;
-        }
 
         $stores = $storeCode !== null
             ? [$this->storeManager->getStore($storeCode)]
             : $this->storeManager->getStores();
 
-        $directory = $this->filesystem->getDirectoryWrite(DirectoryList::MEDIA);
+        $directory = $this->filesystem->getDirectoryWrite(FilePathResolver::DIRECTORY);
         $directory->create(FilePathResolver::SUB_DIR);
 
         foreach ($stores as $store) {
@@ -85,7 +82,9 @@ class AgentsMdGenerator
 
             $isActive = !method_exists($store, 'isActive') || $store->isActive();
             if (!$isActive
+                || !$this->config->isEnabled($store)
                 || $this->config->isStoreExcluded($store)
+                || $this->restrictedGuard->isBlocked($store)
                 || !$this->config->isAgentsMdEnabled($store)
             ) {
                 $this->deleteIfExists($directory, $relativePath);
@@ -138,7 +137,7 @@ class AgentsMdGenerator
     private function buildContext(StoreInterface $store): array
     {
         $baseUrl = $store instanceof Store
-            ? (string) $store->getBaseUrl(UrlInterface::URL_TYPE_LINK, $store->isFrontUrlSecure())
+            ? \Angeo\LlmsTxt\Model\Output\OutputContext::storefrontBaseUrl($store)
             : '';
         $storeId = $store->getId();
 

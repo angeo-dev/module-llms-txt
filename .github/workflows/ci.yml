@@ -5,6 +5,10 @@ on:
     branches: [main]
   pull_request:
 
+# Least privilege: the jobs only read the repository.
+permissions:
+  contents: read
+
 jobs:
   quality:
     name: PHP ${{ matrix.php }}
@@ -15,10 +19,10 @@ jobs:
         php: ['8.1', '8.2', '8.3', '8.4', '8.5']
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Set up PHP
-        uses: shivammathur/setup-php@v2
+        uses: shivammathur/setup-php@ec406be512d7077f68eed36e63f4d91bc006edc4 # 2.35.4
         with:
           php-version: ${{ matrix.php }}
           extensions: bcmath, ctype, curl, dom, gd, iconv, intl, json, mbstring, openssl, pdo_mysql, simplexml, soap, sockets, sodium, xsl, zip
@@ -51,6 +55,13 @@ jobs:
       - name: Unit tests
         run: vendor/bin/phpunit --configuration phpunit.xml
 
+      # Reports known-vulnerable packages in the resolved tree. Non-blocking:
+      # advisories against Magento core itself cannot be fixed in this module,
+      # but they must stay visible in the log.
+      - name: Composer audit
+        run: composer audit --no-interaction --abandoned=report
+        continue-on-error: true
+
   # PHPStan runs once, on one PHP version, as in the Mage-OS modules
   # (mage-os-lab/module-blog). bitexpert/phpstan-magento generates the Magento
   # factory classes during analysis, so no stub files are needed.
@@ -62,9 +73,9 @@ jobs:
     name: PHPStan
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
-      - uses: shivammathur/setup-php@v2
+      - uses: shivammathur/setup-php@ec406be512d7077f68eed36e63f4d91bc006edc4 # 2.35.4
         with:
           php-version: '8.2'
           extensions: bcmath, ctype, curl, dom, gd, iconv, intl, json, mbstring, openssl, pdo_mysql, simplexml, soap, sockets, sodium, xsl, zip

@@ -52,6 +52,7 @@ class Sanitizer implements SanitizerInterface
         }
 
         $current = $rawContent;
+        $failed  = false;
         foreach ($this->filters as $name => $filter) {
             if (!$filter instanceof SanitizerFilterInterface) {
                 continue;
@@ -66,7 +67,16 @@ class Sanitizer implements SanitizerInterface
                     $e->getMessage()
                 ));
                 // continue with previous value
+                $failed = true;
             }
+        }
+
+        // 5.0.0: fail closed. If any stage failed, the text may still hold
+        // markup the HTML stage would have removed; strip every tag shape
+        // before it can reach a public file.
+        if ($failed) {
+            $current = preg_replace('#<\s*(script|style)\b[^>]*>.*?(</\s*\1\s*>|$)#is', '', $current) ?? '';
+            $current = trim(strip_tags($current));
         }
 
         if ($maxLength !== null && $maxLength > 0) {

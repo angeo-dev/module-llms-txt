@@ -109,7 +109,7 @@ class ProductEntityProvider implements EntityProviderInterface
             if ($wantStock) {
                 // Batch: one stock lookup per collection page, never one
                 // round-trip per product (the 3.1.1 regression).
-                if ($useMsi) {
+                if ($useMsi && $this->salableResolver !== null) {
                     $skus = [];
                     foreach ($collection as $product) {
                         $skus[] = (string) $product->getSku();
@@ -219,7 +219,11 @@ class ProductEntityProvider implements EntityProviderInterface
             return null;
         }
 
-        return rtrim($store->getBaseUrl(UrlInterface::URL_TYPE_MEDIA), '/')
+        // Secure flag from the store setting: from cron/CLI "currently secure"
+        // is always false and produced http:// image URLs.
+        $secure = method_exists($store, 'isFrontUrlSecure') ? (bool) $store->isFrontUrlSecure() : null;
+
+        return rtrim($store->getBaseUrl(UrlInterface::URL_TYPE_MEDIA, $secure), '/')
             . '/catalog/product'
             . '/' . ltrim($image, '/');
     }

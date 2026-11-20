@@ -13,19 +13,21 @@ use Angeo\LlmsTxt\Api\FormatRendererInterface;
 use Angeo\LlmsTxt\Api\GenerationStatusRepositoryInterface;
 use Angeo\LlmsTxt\Api\OutputContextInterface;
 use Angeo\LlmsTxt\Api\UrlResolverInterface;
+use Angeo\LlmsTxt\Model\Access\RestrictedCatalogGuard;
 use Angeo\LlmsTxt\Model\Config;
 use Angeo\LlmsTxt\Model\Generator\GenerationSummary;
 use Angeo\LlmsTxt\Model\Output\FilePathResolver;
+use Angeo\LlmsTxt\Model\Output\LegacyOutputCleaner;
 use Angeo\LlmsTxt\Model\Output\OutputContextFactory;
 use Angeo\LlmsTxt\Model\Output\AgentSurfacesBlock;
 use Angeo\LlmsTxt\Model\Output\Signature;
 use Angeo\LlmsTxt\Model\Output\SurfaceRegistry;
 use Angeo\LlmsTxt\Model\Pipeline\ChangeDetector;
 use Magento\Framework\App\Area;
-use Magento\Framework\App\Filesystem\DirectoryList;
 use Magento\Framework\Event\ManagerInterface as EventManagerInterface;
 use Magento\Framework\Filesystem;
 use Magento\Framework\Filesystem\Directory\WriteInterface;
+use Magento\Framework\Lock\LockManagerInterface;
 use Magento\Framework\View\DesignInterface;
 use Magento\Store\Api\Data\StoreInterface;
 use Magento\Store\Model\App\Emulation;
@@ -50,6 +52,9 @@ use Psr\Log\LoggerInterface;
  */
 class SinglePassGenerator
 {
+    /** Lock name prefix; the store code is appended. @since 5.0.0 */
+    public const LOCK_PREFIX = 'angeo_llms_';
+
     /**
      * @param EntityProviderInterface[] $entityProviders ordered via di.xml
      * @param FormatRendererInterface[] $renderers keyed by FORMAT_* code via di.xml
@@ -66,6 +71,9 @@ class SinglePassGenerator
         private readonly EventManagerInterface $eventManager,
         private readonly GenerationStatusRepositoryInterface $statusRepository,
         private readonly FilePathResolver $pathResolver,
+        private readonly LockManagerInterface $lockManager,
+        private readonly LegacyOutputCleaner $legacyCleaner,
+        private readonly RestrictedCatalogGuard $restrictedGuard,
         private readonly array $entityProviders = [],
         private readonly array $renderers = [],
         ?Signature $signature = null,
@@ -110,16 +118,18 @@ class SinglePassGenerator
             }
         }
 
-        if (!$this->config->isEnabled()) {
-            $this->logger->info('[Angeo LlmsTxt] Module is disabled — generation skipped.');
-            return $summaries;
-        }
+        // 5.0.0: no global "enabled" short-circuit. The flag is store-scoped;
+        // reading it without a store checked the default store view only, so a
+        // per-store Enable was ignored — and a disabled module never cleaned up
+        // its files. Each store is now checked on its own in processStore(),
+        // and a disabled store gets its files deleted.
+        $this->legacyCleaner->clean();
 
         $stores = $storeCode
             ? [$this->storeManager->getStore($storeCode)]
             : $this->storeManager->getStores();
 
-        $directory = $this->filesystem->getDirectoryWrite(DirectoryList::MEDIA);
+        $directory = $this->filesystem->getDirectoryWrite(FilePathResolver::DIRECTORY);
         $directory->create(FilePathResolver::SUB_DIR);
 
         foreach ($stores as $store) {
@@ -140,7 +150,10 @@ class SinglePassGenerator
     ): void {
         $code = $store->getCode();
         $isActive = !method_exists($store, 'isActive') || $store->isActive();
-        $storeEligible = $isActive && !$this->config->isStoreExcluded($store);
+        $storeEligible = $isActive
+            && $this->config->isEnabled($store)
+            && !$this->config->isStoreExcluded($store)
+            && !$this->isBlockedByAccessRules($store);
 
         // Decide which formats run for this store; clean up stale files for the rest.
         $activeFormats = [];
@@ -167,9 +180,23 @@ class SinglePassGenerator
             return;
         }
 
+        // 5.0.0: Magento lock manager (database lock by default) instead of
+        // flock() on a file in the output directory. Works across web nodes
+        // and on remote storage, and a run that cannot get the lock no longer
+        // deletes the lock of the run that holds it or records a failure.
+        $lockName = self::LOCK_PREFIX . $code;
+        if (!$this->lockManager->lock($lockName, 0)) {
+            foreach ($activeFormats as $format) {
+                $summaries[$format]->skip($code);
+            }
+            $this->logger->info(sprintf(
+                '[Angeo LlmsTxt] Generation for store %s is already running — skipped.',
+                $code
+            ));
+            return;
+        }
+
         $emulated   = false;
-        $lockHandle = null;
-        $lockPath   = FilePathResolver::SUB_DIR . '/store_' . $code . '.lock';
         $startedAt  = microtime(true);
         /** @var array<string, array{stream: \Magento\Framework\Filesystem\File\WriteInterface, tmp: string, final: string, bytes: int, items: int}> $streams */
         $streams = [];
@@ -183,12 +210,6 @@ class SinglePassGenerator
 
             $this->urlResolver->reset();
             $this->urlResolver->warmUp((int) $store->getId());
-
-            // One per-store lock covers all format streams of this pass.
-            $lockHandle = $this->acquireLock($directory, $lockPath);
-            if ($lockHandle === null) {
-                throw new \RuntimeException(sprintf('Generation already in progress for store %s', $code));
-            }
 
             // One sanitation context for the whole pass (max verbosity).
             $context = $this->contextFactory->create(
@@ -239,12 +260,15 @@ class SinglePassGenerator
                         unset($s);
                     }
                 } catch (\Throwable $e) {
-                    $this->logger->warning(sprintf(
-                        '[Angeo LlmsTxt] Entity provider %s failed for store %s: %s',
+                    // 5.0.0: a failed provider aborts the store. Before, the
+                    // half-written file was published and recorded as success,
+                    // silently dropping every entity after the failure point.
+                    // Now the previous good file stays in place.
+                    throw new \RuntimeException(sprintf(
+                        'Entity provider %s failed: %s',
                         $provider::class,
-                        $code,
                         $e->getMessage()
-                    ));
+                    ), 0, $e);
                 }
             }
 
@@ -283,7 +307,10 @@ class SinglePassGenerator
             foreach ($streams as $format => $s) {
                 $s['stream']->close();
                 if ($s['bytes'] === 0) {
+                    // Nothing to publish: drop the tmp file AND any previous
+                    // file, so an emptied catalog does not keep serving stale data.
                     $this->deleteIfExists($directory, $s['tmp']);
+                    $this->deleteIfExists($directory, $s['final']);
                 } else {
                     $directory->renameFile($s['tmp'], $s['final']);
                 }
@@ -336,7 +363,7 @@ class SinglePassGenerator
                 $e->getMessage()
             ), ['exception' => $e]);
         } finally {
-            $this->releaseLock($directory, $lockPath, $lockHandle);
+            $this->lockManager->unlock($lockName);
             if ($emulated) {
                 $this->emulation->stopEnvironmentEmulation();
             }
@@ -388,6 +415,21 @@ class SinglePassGenerator
         return $lastChange !== null && $lastChange <= $oldestSuccess;
     }
 
+    private function isBlockedByAccessRules(StoreInterface $store): bool
+    {
+        if (!$this->restrictedGuard->isBlocked($store)) {
+            return false;
+        }
+        $this->logger->warning(sprintf(
+            '[Angeo LlmsTxt] Store %s skipped: %s active. The export would publish the hidden catalog. '
+            . 'Set "Publish Even With Catalog Access Rules" = Yes only if that is intended.',
+            $store->getCode(),
+            implode(', ', $this->restrictedGuard->activeRestrictions($store))
+        ));
+
+        return true;
+    }
+
     private function renderer(string $format): FormatRendererInterface
     {
         $renderer = $this->renderers[$format] ?? null;
@@ -420,38 +462,5 @@ class SinglePassGenerator
                 $e->getMessage()
             ));
         }
-    }
-
-    /**
-     * @return resource|null
-     */
-    private function acquireLock(WriteInterface $directory, string $lockPath): mixed
-    {
-        $absolute = $directory->getAbsolutePath($lockPath);
-        $parent = dirname($lockPath);
-        if (!$directory->isExist($parent)) {
-            $directory->create($parent);
-        }
-        $handle = fopen($absolute, 'c+');
-        if ($handle === false) {
-            return null;
-        }
-        if (!flock($handle, LOCK_EX | LOCK_NB)) {
-            fclose($handle);
-            return null;
-        }
-        return $handle;
-    }
-
-    /**
-     * @param resource|null $handle
-     */
-    private function releaseLock(WriteInterface $directory, string $lockPath, mixed $handle): void
-    {
-        if (is_resource($handle)) {
-            flock($handle, LOCK_UN);
-            fclose($handle);
-        }
-        $this->deleteIfExists($directory, $lockPath);
     }
 }

@@ -1,48 +1,57 @@
 <?php
 /**
- * Live status panel for generated files. Polls /angeo_llms/status/index every minute.
+ * Live status panel for generated files. Polls /angeo_llms/status/index every
+ * minute with jQuery.getJSON.
+ *
+ * 5.0.0: the script is emitted through SecureHtmlRenderer (CSP nonce) and all
+ * translated strings are escaped.
  *
  * @var \Angeo\LlmsTxt\Block\Adminhtml\System\Config\StatusPanel $block
+ * @var \Magento\Framework\Escaper $escaper
+ * @var \Magento\Framework\View\Helper\SecureHtmlRenderer $secureRenderer
  */
 declare(strict_types=1);
 
-$panelId = 'angeo-llms-status-' . uniqid();
-$url = $block->getStatusUrl();
+$panelId = 'angeo-llms-status-' . bin2hex(random_bytes(6));
 ?>
-<div id="<?= /* @noEscape */ $panelId ?>" class="angeo-llms-status-panel">
+<div id="<?= $escaper->escapeHtmlAttr($panelId) ?>" class="angeo-llms-status-panel">
     <table class="admin__table-primary" style="width:100%; border-collapse: collapse;">
         <thead>
             <tr>
-                <th style="text-align:left; padding:6px;"><?= /* @noEscape */ __('Store') ?></th>
-                <th style="text-align:left; padding:6px;"><?= /* @noEscape */ __('Format') ?></th>
-                <th style="text-align:left; padding:6px;"><?= /* @noEscape */ __('Status') ?></th>
-                <th style="text-align:left; padding:6px;"><?= /* @noEscape */ __('Last Success (UTC)') ?></th>
-                <th style="text-align:right; padding:6px;"><?= /* @noEscape */ __('Size') ?></th>
-                <th style="text-align:right; padding:6px;"><?= /* @noEscape */ __('Items') ?></th>
-                <th style="text-align:right; padding:6px;"><?= /* @noEscape */ __('Duration') ?></th>
+                <th style="text-align:left; padding:6px;"><?= $escaper->escapeHtml(__('Store')) ?></th>
+                <th style="text-align:left; padding:6px;"><?= $escaper->escapeHtml(__('Format')) ?></th>
+                <th style="text-align:left; padding:6px;"><?= $escaper->escapeHtml(__('Status')) ?></th>
+                <th style="text-align:left; padding:6px;"><?= $escaper->escapeHtml(__('Last Success (UTC)')) ?></th>
+                <th style="text-align:right; padding:6px;"><?= $escaper->escapeHtml(__('Size')) ?></th>
+                <th style="text-align:right; padding:6px;"><?= $escaper->escapeHtml(__('Items')) ?></th>
+                <th style="text-align:right; padding:6px;"><?= $escaper->escapeHtml(__('Duration')) ?></th>
             </tr>
         </thead>
         <tbody data-role="rows">
-            <tr><td colspan="7" style="padding:12px; text-align:center; color:#666;"><?= /* @noEscape */ __('Loading status…') ?></td></tr>
+            <tr><td colspan="7" style="padding:12px; text-align:center; color:#666;"><?= $escaper->escapeHtml(__('Loading status…')) ?></td></tr>
         </tbody>
     </table>
     <p style="margin:10px 0 0; padding:8px 10px; background:#f8f8f8; border-left:3px solid #4690BF; color:#41362f;">
-        <strong><?= $block->escapeHtml(__('Next step:')) ?></strong>
-        <?= $block->escapeHtml(__('generated files tell AI engines about your store — now check how they actually see it.')) ?>
-        <a href="<?= $block->escapeUrl($block->getScanUrl()) ?>" target="_blank" rel="noopener">
-            <?= $block->escapeHtml(__('Run a free AEO scan')) ?></a>.
-        <?= $block->escapeHtml(__('Large catalog or custom setup?')) ?>
-        <a href="mailto:<?= $block->escapeHtmlAttr($block->getSupportEmail()) ?>"><?= $block->escapeHtml($block->getSupportEmail()) ?></a>
+        <strong><?= $escaper->escapeHtml(__('Next step:')) ?></strong>
+        <?= $escaper->escapeHtml(__('generated files tell AI engines about your store — now check how they actually see it.')) ?>
+        <a href="<?= $escaper->escapeUrl($block->getScanUrl()) ?>" target="_blank" rel="noopener">
+            <?= $escaper->escapeHtml(__('Run a free AEO scan')) ?></a>.
+        <?= $escaper->escapeHtml(__('Large catalog or custom setup?')) ?>
+        <a href="mailto:<?= $escaper->escapeHtmlAttr($block->getSupportEmail()) ?>"><?= $escaper->escapeHtml($block->getSupportEmail()) ?></a>
     </p>
 </div>
-
-<script>
+<?php
+$jsonFlags = JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT;
+$config = json_encode([
+    'panelId'  => $panelId,
+    'url'      => $block->getStatusUrl(),
+    'empty'    => (string) __('No generations recorded yet.'),
+    'loadFail' => (string) __('Could not load status.'),
+], $jsonFlags);
+$script = "(function (cfg) {\n" . <<<'JS'
 require(['jquery'], function ($) {
     'use strict';
-    var $panel = $('#<?= /* @noEscape */ $panelId ?>');
-    var $tbody = $panel.find('[data-role="rows"]');
-    // json_encode → safe JS string literal (Magento secure-rendering guideline).
-    var url = <?= /* @noEscape */ json_encode($url) ?>;
+    var $tbody = $(document.getElementById(cfg.panelId)).find('[data-role="rows"]');
 
     function escape(s) { return $('<div/>').text(s == null ? '' : s).html(); }
 
@@ -53,39 +62,47 @@ require(['jquery'], function ($) {
         return b + ' B';
     }
 
+    function message(text, color) {
+        $tbody.html('<tr><td colspan="7" style="padding:12px; text-align:center; color:' + color + ';">'
+            + escape(text) + '</td></tr>');
+    }
+
     function render(items) {
         if (!items || !items.length) {
-            $tbody.html('<tr><td colspan="7" style="padding:12px; text-align:center; color:#666;">No generations recorded yet.</td></tr>');
+            message(cfg.empty, '#666');
             return;
         }
         var rows = items.map(function (it) {
             var color = it.status === 'success' ? '#1e8400' : (it.status === 'failed' ? '#c00' : '#666');
-            var lastSuccess = it.last_success_iso || '—';
+            var duration = parseFloat(it.duration_seconds) || 0;
             return '<tr>'
                 + '<td style="padding:6px;">' + escape(it.store_code) + '</td>'
                 + '<td style="padding:6px;">' + escape(it.format) + '</td>'
                 + '<td style="padding:6px; color:' + color + ';"><strong>' + escape(it.status) + '</strong></td>'
-                + '<td style="padding:6px;">' + escape(lastSuccess) + '</td>'
+                + '<td style="padding:6px;">' + escape(it.last_success_iso || '—') + '</td>'
                 + '<td style="padding:6px; text-align:right;">' + formatBytes(it.byte_size) + '</td>'
                 + '<td style="padding:6px; text-align:right;">' + escape(it.item_count) + '</td>'
-                + '<td style="padding:6px; text-align:right;">' + (it.duration_seconds || 0).toFixed(2) + 's</td>'
+                + '<td style="padding:6px; text-align:right;">' + duration.toFixed(2) + 's</td>'
                 + '</tr>'
                 + (it.error_message
-                    ? '<tr><td colspan="7" style="padding:0 6px 8px; color:#c00; font-size:11px;">' + escape(it.error_message) + '</td></tr>'
+                    ? '<tr><td colspan="7" style="padding:0 6px 8px; color:#c00; font-size:11px;">'
+                        + escape(it.error_message) + '</td></tr>'
                     : '');
         }).join('');
         $tbody.html(rows);
     }
 
     function load() {
-        $.getJSON(url).done(function (data) {
+        $.getJSON(cfg.url).done(function (data) {
             render(data.items || []);
         }).fail(function () {
-            $tbody.html('<tr><td colspan="7" style="padding:12px; color:#c00; text-align:center;">Could not load status.</td></tr>');
+            message(cfg.loadFail, '#c00');
         });
     }
 
     load();
     setInterval(load, 60000);
 });
-</script>
+JS . "\n})(" . $config . ');';
+?>
+<?= /* @noEscape */ $secureRenderer->renderTag('script', [], $script, false) ?>

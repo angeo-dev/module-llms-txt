@@ -31,9 +31,13 @@ use Psr\Log\LoggerInterface;
  *   /sitemap_agentic_discovery.xml → AgenticSitemap controller (since 4.0.0)
  *   /{path}.md       → MdMirror controller (when md_mirror is enabled)
  *
- * Multi-store: Magento's store-resolution (path-based or code-based) has already
- * applied by the time this router runs; we look at the LAST path segment so the
- * file works whether the request is /llms.txt or /de/llms.txt.
+ * Multi-store: Magento's store resolution has already run and removed the
+ * store-code segment from the path info, so /de/llms.txt arrives here as
+ * "llms.txt".
+ *
+ * 5.0.0: the discovery files match only at the store root. Before, any path
+ * ending in /llms.txt matched (/a/b/c/llms.txt), which created unlimited
+ * duplicate URLs and cache entries for the same file.
  *
  * Routing precedence (3.1.0): this router is registered with sortOrder=70 —
  * AFTER the urlrewrite (20), standard (30), and CMS (60) routers. That means
@@ -86,7 +90,9 @@ class Router implements RouterInterface
         $lastSlash = strrpos($path, '/');
         $tail = $lastSlash === false ? $path : substr($path, $lastSlash + 1);
 
-        if ($tail === self::AGENTIC_SITEMAP) {
+        $isRoot = $lastSlash === false;
+
+        if ($isRoot && $tail === self::AGENTIC_SITEMAP) {
             $request
                 ->setModuleName('llms')
                 ->setControllerName('index')
@@ -96,7 +102,7 @@ class Router implements RouterInterface
             return $this->actionFactory->create(AgenticSitemapController::class);
         }
 
-        if (isset(self::FILE_ROUTES[$tail])) {
+        if ($isRoot && isset(self::FILE_ROUTES[$tail])) {
             $request
                 ->setModuleName('llms')
                 ->setControllerName('index')

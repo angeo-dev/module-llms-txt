@@ -130,6 +130,13 @@
                     <source_model>Angeo\LlmsTxt\Model\Config\Source\CustomerGroup</source_model>
                     <comment><![CDATA[Product prices reflect this group's final price (special prices, group prices). Default: NOT LOGGED IN.<br/><strong style="color:#c00;">⚠ Security warning:</strong> the generated files are <strong>publicly accessible and CDN-cacheable</strong>. Selecting a logged-in / wholesale / B2B group publishes that group's negotiated pricing to anyone on the internet, including competitors. Only change this if that is explicitly intended.]]></comment>
                 </field>
+
+                <field id="allow_restricted_catalog" translate="label comment" type="select" sortOrder="90"
+                       showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Publish Even With Catalog Access Rules</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment><![CDATA[This module exports ONE public view of the catalog. It does not apply Catalog Permissions, B2B Shared Catalogs or Website Restrictions. When any of these is active for a store, nothing is generated or served for that store unless you set this to <strong>Yes</strong>. <strong style="color:#c00;">⚠</strong> Yes publishes every enabled, visible product, category and price of the store to the internet.]]></comment>
+                </field>
             </group>
 
             <!-- ─── Output formats ─── -->
@@ -357,7 +364,7 @@
                 <field id="cache_ttl_seconds" translate="label comment" type="text" sortOrder="10"
                        showInDefault="1" showInWebsite="0" showInStore="0">
                     <label>Cache-Control TTL (seconds)</label>
-                    <validate>validate-digits</validate>
+                    <validate>validate-digits validate-digits-range digits-range-60-604800</validate>
                     <comment><![CDATA[Sent as <code>Cache-Control: public, max-age=</code> on the served files. Default 3600.]]></comment>
                 </field>
             </group>
@@ -370,6 +377,7 @@
                 <field id="schedule" translate="label comment" type="text" sortOrder="10"
                        showInDefault="1" showInWebsite="0" showInStore="0">
                     <label>Cron Expression</label>
+                    <backend_model>Angeo\LlmsTxt\Model\Config\Backend\CronExpression</backend_model>
                     <comment><![CDATA[Standard cron expression. Default: <code>0 2 * * *</code> (daily at 02:00 server time).]]></comment>
                 </field>
             </group>

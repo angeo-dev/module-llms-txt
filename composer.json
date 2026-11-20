@@ -1,8 +1,7 @@
 {
     "name": "angeo/module-llms-txt",
-    "description": "Magento 2 module for AI Engine Optimization (AEO). Generates llms.txt and llms-full.txt to the llmstxt.org v2 specification, plus streaming JSONL for vector indexing and agents.md for AI shopping agents. Link relations, markdown mirrors, agentic discovery sitemap, availability and attribute export, multi-store, CLI, cron, async admin UI, Page Builder-aware sanitization, customer-group pricing, atomic writes, ETag/Cache-Control. Natively Hyvä-compatible — no frontend JS or CSS.",
+    "description": "Magento 2 module for Answer Engine Optimization (AEO). Generates llms.txt and llms-full.txt to the llmstxt.org v2 specification, plus streaming JSONL for vector indexing and agents.md for AI shopping agents. Link relations, markdown mirrors, agentic discovery sitemap, availability and attribute export, multi-store, CLI, cron, async admin UI, Page Builder-aware sanitization, customer-group pricing, atomic writes, ETag/Cache-Control. Generated files live in var/ and are served only through the module's controller. Natively Hyvä-compatible — no frontend JS or CSS.",
     "type": "magento2-module",
-    "version": "4.4.0",
     "keywords": [
         "magento2",
         "magento-module",
@@ -60,7 +59,6 @@
     },
     "suggest": {
         "magento/module-page-builder": "Enable to opt-in or opt-out of Page Builder content elements per content-type during sanitization",
-        "magento/module-shared-catalog": "Adobe Commerce: integrate B2B shared catalogs so llms.txt only exposes the allowed catalog",
         "magento/module-inventory-sales-api": "Read salable status through Multi-Source Inventory. Optional — the module falls back to the legacy stock index when MSI is not installed."
     },
     "autoload": {

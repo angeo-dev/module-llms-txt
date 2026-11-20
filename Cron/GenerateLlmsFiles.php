@@ -8,7 +8,6 @@ declare(strict_types=1);
 
 namespace Angeo\LlmsTxt\Cron;
 
-use Angeo\LlmsTxt\Model\Config;
 use Angeo\LlmsTxt\Service\GenerationService;
 use Psr\Log\LoggerInterface;
 
@@ -27,17 +26,15 @@ class GenerateLlmsFiles
 {
     public function __construct(
         private readonly GenerationService $generationService,
-        private readonly LoggerInterface $logger,
-        private readonly Config $config
+        private readonly LoggerInterface $logger
     ) {
     }
 
     public function execute(): void
     {
-        if (!$this->config->isEnabled()) {
-            return;
-        }
-
+        // No global "enabled" check (5.0.0): the flag is store-scoped. The
+        // pipeline checks each store and removes files of disabled stores, so
+        // switching the module off also takes its files offline.
         try {
             $this->generationService->generateAll();
         } catch (\Throwable $e) {

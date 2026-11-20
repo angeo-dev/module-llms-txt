@@ -40,12 +40,13 @@ class SignatureTest extends TestCase
         self::assertStringContainsString('https://angeo.dev/', $sig);
     }
 
-    public function testTxtSignatureCarriesModuleVersion(): void
+    public function testSignatureDoesNotRevealModuleVersion(): void
     {
-        self::assertStringContainsString(
-            'v' . Config::MODULE_VERSION,
-            $this->signature->forTxt()
-        );
+        // 5.0.0: the public footer must not fingerprint the installed release.
+        foreach ([$this->signature->forTxt(), $this->signature->forAgentsMd(), $this->signature->forMdMirror()] as $sig) {
+            self::assertStringNotContainsString(Config::MODULE_VERSION, $sig);
+            self::assertDoesNotMatchRegularExpression('/\bv\d+\.\d+/', $sig);
+        }
     }
 
     public function testSignatureIsSingleTrailingParagraph(): void

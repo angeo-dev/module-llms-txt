@@ -58,8 +58,12 @@ class HtmlFilter implements SanitizerFilterInterface
 
         // … then strip again: decoding can resurrect tag-like sequences
         // (e.g. "&lt;script&gt;") that must not survive into the output.
+        // 5.0.0: remove only real tag shapes ("<" + letter, "</", "<!", "<?").
+        // strip_tags() here also ate plain text such as "&lt;3 years" → "",
+        // because it treats a lone "<" as the start of a tag up to the end.
         $content = $this->stripActiveContent($content);
-        $content = strip_tags($content);
+        $content = preg_replace('#<!--.*?(-->|$)#s', '', $content) ?? $content;
+        $content = preg_replace('#<(?:/?[a-z][a-z0-9-]*|!|\?)[^>]*(?:>|$)#is', '', $content) ?? $content;
 
         // Collapse runs of whitespace, but preserve single newlines as paragraph hints.
         $content = preg_replace('/[ \t\x{00A0}]+/u', ' ', $content) ?? $content;

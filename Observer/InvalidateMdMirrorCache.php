@@ -10,6 +10,10 @@ namespace Angeo\LlmsTxt\Observer;
 
 use Angeo\LlmsTxt\Model\Cache\MdMirrorCacheKey;
 use Angeo\LlmsTxt\Model\Config;
+use Angeo\LlmsTxt\Model\Pipeline\ChangeMarker;
+use Magento\Catalog\Api\Data\CategoryInterface;
+use Magento\Catalog\Api\Data\ProductInterface;
+use Magento\Cms\Api\Data\PageInterface;
 use Magento\Framework\App\CacheInterface;
 use Magento\Framework\Event\Observer;
 use Magento\Framework\Event\ObserverInterface;
@@ -35,12 +39,13 @@ use Psr\Log\LoggerInterface;
  */
 class InvalidateMdMirrorCache implements ObserverInterface
 {
-    /** Event object key => url_rewrite entity type. */
-    private const ENTITY_TYPES = [
-        'product'  => 'product',
-        'category' => 'category',
-        'page'     => 'cms-page',
-    ];
+    /**
+     * Event data keys that may carry the entity. 5.0.0: CMS pages have no
+     * $_eventObject, so cms_page_* events carry the page under "object" /
+     * "data_object" — the old "page" key never matched and CMS mirrors were
+     * never invalidated.
+     */
+    private const EVENT_KEYS = ['product', 'category', 'object', 'data_object', 'page'];
 
     public function __construct(
         private readonly CacheInterface $cache,
@@ -48,7 +53,8 @@ class InvalidateMdMirrorCache implements ObserverInterface
         private readonly StoreManagerInterface $storeManager,
         private readonly MdMirrorCacheKey $cacheKey,
         private readonly Config $config,
-        private readonly LoggerInterface $logger
+        private readonly LoggerInterface $logger,
+        private readonly ChangeMarker $changeMarker
     ) {
     }
 
@@ -58,6 +64,11 @@ class InvalidateMdMirrorCache implements ObserverInterface
             [$entityId, $entityType] = $this->resolveEntity($observer);
             if ($entityId === null) {
                 return;
+            }
+
+            // Deletes are invisible to ChangeDetector's timestamps (5.0.0).
+            if (str_ends_with((string) $observer->getEvent()->getName(), '_delete_after')) {
+                $this->changeMarker->markDeleted();
             }
 
             foreach ($this->storeManager->getStores() as $store) {
@@ -76,10 +87,11 @@ class InvalidateMdMirrorCache implements ObserverInterface
 
                 foreach ($rewrites as $rewrite) {
                     // Every rewrite the entity ever had, including old ones
-                    // kept as redirects — each could hold a cached mirror.
-                    $this->cache->remove(
-                        $this->cacheKey->forPath((int) $store->getId(), $rewrite->getRequestPath())
-                    );
+                    // kept as redirects — each could hold a cached mirror,
+                    // under every path form the controller accepts.
+                    foreach ($this->pathVariants((string) $rewrite->getRequestPath()) as $path) {
+                        $this->cache->remove($this->cacheKey->forPath((int) $store->getId(), $path));
+                    }
                 }
             }
         } catch (\Throwable $e) {
@@ -96,13 +108,44 @@ class InvalidateMdMirrorCache implements ObserverInterface
      */
     private function resolveEntity(Observer $observer): array
     {
-        foreach (self::ENTITY_TYPES as $eventKey => $urlRewriteType) {
+        foreach (self::EVENT_KEYS as $eventKey) {
             $entity = $observer->getEvent()->getData($eventKey);
-            if ($entity !== null && method_exists($entity, 'getId') && $entity->getId()) {
-                return [(int) $entity->getId(), $urlRewriteType];
+            if (!is_object($entity) || !method_exists($entity, 'getId') || !$entity->getId()) {
+                continue;
+            }
+            $type = match (true) {
+                $entity instanceof ProductInterface  => 'product',
+                $entity instanceof CategoryInterface => 'category',
+                $entity instanceof PageInterface     => 'cms-page',
+                default                              => null,
+            };
+            if ($type !== null) {
+                return [(int) $entity->getId(), $type];
             }
         }
 
         return [null, ''];
+    }
+
+    /**
+     * Cache keys the controller may have used for one rewrite: the stored
+     * path ("shirt.html" ← /shirt.html.md), without its suffix
+     * ("shirt" ← /shirt.md) and without a trailing slash ("shoes" ← /shoes.md
+     * for a "shoes/" rewrite).
+     *
+     * @return string[]
+     */
+    private function pathVariants(string $requestPath): array
+    {
+        $paths = [$requestPath];
+        $trimmed = rtrim($requestPath, '/');
+        if ($trimmed !== $requestPath && $trimmed !== '') {
+            $paths[] = $trimmed;
+        }
+        if (str_ends_with($trimmed, '.html')) {
+            $paths[] = substr($trimmed, 0, -5);
+        }
+
+        return array_values(array_unique($paths));
     }
 }

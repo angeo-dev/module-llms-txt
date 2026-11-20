@@ -10,11 +10,11 @@ namespace Angeo\LlmsTxt\Controller\Index;
 
 use Angeo\LlmsTxt\Controller\Router;
 use Angeo\LlmsTxt\Api\OutputContextInterface;
+use Angeo\LlmsTxt\Model\Access\RestrictedCatalogGuard;
 use Angeo\LlmsTxt\Model\Config;
 use Angeo\LlmsTxt\Model\Output\FilePathResolver;
 use Magento\Framework\App\Action\HttpGetActionInterface;
 use Magento\Framework\App\ActionInterface;
-use Magento\Framework\App\Filesystem\DirectoryList;
 use Magento\Framework\App\RequestInterface;
 use Magento\Framework\App\Response\Http as HttpResponse;
 use Magento\Framework\Controller\Result\Raw;
@@ -63,7 +63,8 @@ class Index implements ActionInterface, HttpGetActionInterface
         private readonly RawFactory $resultRawFactory,
         private readonly Config $config,
         private readonly Filesystem $filesystem,
-        private readonly LoggerInterface $logger
+        private readonly LoggerInterface $logger,
+        private readonly RestrictedCatalogGuard $restrictedGuard
     ) {
     }
 
@@ -73,7 +74,11 @@ class Index implements ActionInterface, HttpGetActionInterface
             $store = $this->storeManager->getStore();
             $file  = (string) $this->request->getParam(Router::PARAM_FILE, 'llms.txt');
 
-            if (!$this->config->isEnabled($store) || $this->config->isStoreExcluded($store)) {
+            if (
+                !$this->config->isEnabled($store)
+                || $this->config->isStoreExcluded($store)
+                || $this->restrictedGuard->isBlocked($store)
+            ) {
                 return $this->notFound("Not available.\n");
             }
             if (method_exists($store, 'isActive') && !$store->isActive()) {
@@ -82,9 +87,15 @@ class Index implements ActionInterface, HttpGetActionInterface
             if (!isset(self::MIME[$file])) {
                 return $this->notFound("Not found.\n");
             }
+            // 5.0.0: serve only when the request path IS the file name. The
+            // standard-router route (/llms/index/index?…) reaches this action
+            // too; it must not become a second URL for the same file.
+            if (trim((string) $this->request->getPathInfo(), '/') !== $file) {
+                return $this->notFound("Not found.\n");
+            }
 
             $relativePath = $this->resolveRelativePath($file, $store->getCode());
-            $directory    = $this->filesystem->getDirectoryRead(DirectoryList::MEDIA);
+            $directory    = $this->filesystem->getDirectoryRead(FilePathResolver::DIRECTORY);
             if ($relativePath === null || !$directory->isFile($relativePath)) {
                 return $this->notFound("Not generated yet.\n");
             }
@@ -94,12 +105,7 @@ class Index implements ActionInterface, HttpGetActionInterface
             $size  = (int) ($stat['size'] ?? 0);
             $etag  = sprintf('"%s-%x-%x"', substr(hash('sha256', $relativePath), 0, 8), $mtime, $size);
 
-            $ifNoneMatch = $this->request->getHeader('If-None-Match');
-            $ifModifiedSince = $this->request->getHeader('If-Modified-Since');
-            if (
-                ($ifNoneMatch && trim((string) $ifNoneMatch) === $etag)
-                || ($ifModifiedSince && strtotime((string) $ifModifiedSince) >= $mtime)
-            ) {
+            if ($this->isNotModified($etag, $mtime)) {
                 $this->response->setHttpResponseCode(304);
                 $this->response->setHeader('ETag', $etag, true);
                 $this->response->setHeader('Cache-Control', sprintf(
@@ -130,7 +136,33 @@ class Index implements ActionInterface, HttpGetActionInterface
     }
 
     /**
-     * Map URL → on-disk generated file path (relative to the media directory).
+     * RFC 9110 §13.2.2: If-None-Match wins; If-Modified-Since is only
+     * evaluated when the client sent no If-None-Match.
+     */
+    private function isNotModified(string $etag, int $mtime): bool
+    {
+        $ifNoneMatch = trim((string) $this->request->getHeader('If-None-Match'));
+        if ($ifNoneMatch !== '') {
+            foreach (explode(',', $ifNoneMatch) as $candidate) {
+                $candidate = trim($candidate);
+                if ($candidate === '*' || $candidate === $etag || $candidate === 'W/' . $etag) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        $ifModifiedSince = trim((string) $this->request->getHeader('If-Modified-Since'));
+        if ($ifModifiedSince === '') {
+            return false;
+        }
+        $since = strtotime($ifModifiedSince);
+
+        return $since !== false && $since >= $mtime;
+    }
+
+    /**
+     * Map URL → generated file path (relative to FilePathResolver::DIRECTORY).
      * Resolved via FilePathResolver: identical paths regardless of which
      * generation pipeline (legacy or single-pass) produced the file.
      */

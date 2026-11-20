@@ -8,9 +8,11 @@ declare(strict_types=1);
 
 namespace Angeo\LlmsTxt\Controller\Index;
 
+use Angeo\LlmsTxt\Model\Access\RestrictedCatalogGuard;
 use Angeo\LlmsTxt\Model\Config;
 use Magento\Framework\App\Action\HttpGetActionInterface;
 use Magento\Framework\App\ActionInterface;
+use Magento\Framework\App\RequestInterface;
 use Magento\Framework\App\Response\Http as HttpResponse;
 use Magento\Framework\Controller\Result\Raw;
 use Magento\Framework\Controller\Result\RawFactory;
@@ -39,7 +41,9 @@ class AgenticSitemap implements ActionInterface, HttpGetActionInterface
         private readonly StoreManagerInterface $storeManager,
         private readonly RawFactory $resultRawFactory,
         private readonly Config $config,
-        private readonly LoggerInterface $logger
+        private readonly LoggerInterface $logger,
+        private readonly RequestInterface $request,
+        private readonly RestrictedCatalogGuard $restrictedGuard
     ) {
     }
 
@@ -48,9 +52,15 @@ class AgenticSitemap implements ActionInterface, HttpGetActionInterface
         try {
             $store = $this->storeManager->getStore();
 
+            // Only the real URL — not the /llms/index/agenticsitemap route.
+            if (trim((string) $this->request->getPathInfo(), '/') !== 'sitemap_agentic_discovery.xml') {
+                return $this->notFound();
+            }
+
             if (
                 !$this->config->isEnabled($store)
                 || $this->config->isStoreExcluded($store)
+                || $this->restrictedGuard->isBlocked($store)
                 || !$this->config->isAgenticSitemapEnabled($store)
             ) {
                 return $this->notFound();

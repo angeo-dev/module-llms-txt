@@ -12,6 +12,7 @@ use Angeo\LlmsTxt\Api\FormatRendererInterface;
 use Angeo\LlmsTxt\Api\OutputContextInterface;
 use Angeo\LlmsTxt\Model\Config;
 use Angeo\LlmsTxt\Model\Output\MarkdownUrl;
+use Angeo\LlmsTxt\Model\Text\MarkdownText;
 use Angeo\LlmsTxt\Model\Text\Truncator;
 
 /**
@@ -23,11 +24,15 @@ use Angeo\LlmsTxt\Model\Text\Truncator;
  */
 abstract class AbstractRenderer implements FormatRendererInterface
 {
+    /** Stateless helper; not injected so subclass constructors stay unchanged. */
+    protected readonly MarkdownText $markdown;
+
     public function __construct(
         protected readonly Truncator $truncator,
         protected readonly ?Config $linkConfig = null,
         protected readonly ?MarkdownUrl $markdownUrl = null
     ) {
+        $this->markdown = new MarkdownText();
     }
 
     /**
@@ -60,19 +65,36 @@ abstract class AbstractRenderer implements FormatRendererInterface
     }
 
     /**
-     * Escape markdown special characters in display text (link labels).
-     * Identical character set to the legacy AbstractProvider.
+     * Escape text for a single-line markdown position (link label, heading).
+     *
+     * 5.0.0: also escapes the backslash itself and folds line breaks — a
+     * trailing "\" used to cancel the closing "]", and a newline in a product
+     * name started a new markdown block.
      */
     protected function escapeMarkdown(string $text): string
     {
-        return strtr($text, [
-            '['  => '\\[',
-            ']'  => '\\]',
-            '('  => '\\(',
-            ')'  => '\\)',
-            '|'  => '\\|',
-            '`'  => '\\`',
-        ]);
+        return $this->markdown->inline($text);
+    }
+
+    /**
+     * Body text for a multi-line position (see {@see MarkdownText::block()}).
+     *
+     * @since 5.0.0
+     */
+    protected function safeBlock(string $text): string
+    {
+        return $this->markdown->block($text);
+    }
+
+    /**
+     * Body text for a position after "- [Name](url): " — must stay on the
+     * list item's line.
+     *
+     * @since 5.0.0
+     */
+    protected function safeInlineText(string $text): string
+    {
+        return $this->markdown->oneLine($this->markdown->block($text));
     }
 
     /**

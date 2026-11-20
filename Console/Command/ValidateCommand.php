@@ -11,7 +11,6 @@ namespace Angeo\LlmsTxt\Console\Command;
 use Angeo\LlmsTxt\Api\OutputContextInterface;
 use Angeo\LlmsTxt\Model\Config;
 use Angeo\LlmsTxt\Model\Output\FilePathResolver;
-use Magento\Framework\App\Filesystem\DirectoryList;
 use Magento\Framework\Filesystem;
 use Magento\Framework\Filesystem\Directory\ReadInterface;
 use Magento\Store\Api\Data\StoreInterface;
@@ -79,7 +78,7 @@ class ValidateCommand extends Command
                 static fn($s) => !method_exists($s, 'isActive') || $s->isActive()
             );
 
-        $directory = $this->filesystem->getDirectoryRead(DirectoryList::MEDIA);
+        $directory = $this->filesystem->getDirectoryRead(FilePathResolver::DIRECTORY);
 
         foreach ($stores as $store) {
             $this->validateStore($store, $directory, $output);

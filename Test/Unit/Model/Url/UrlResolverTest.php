@@ -61,6 +61,7 @@ class UrlResolverTest extends TestCase
         $select = $this->createMock(Select::class);
         $select->method('from')->willReturnSelf();
         $select->method('where')->willReturnSelf();
+        $select->method('order')->willReturnSelf();
 
         $statement = $this->statementStub([
             ['entity_id' => 100, 'entity_type' => 'product',  'request_path' => 'p1.html'],
@@ -114,6 +115,7 @@ class UrlResolverTest extends TestCase
         $select = $this->createMock(Select::class);
         $select->method('from')->willReturnSelf();
         $select->method('where')->willReturnSelf();
+        $select->method('order')->willReturnSelf();
 
         $statement = $this->statementStub([
             ['entity_id' => 100, 'entity_type' => 'product', 'request_path' => 'first.html'],
@@ -129,13 +131,7 @@ class UrlResolverTest extends TestCase
         $resource->method('getTableName')->willReturn('url_rewrite');
 
         $store = $this->createMock(Store::class);
-        $store->method('isFrontUrlSecure')->willReturn(true);
-        $store->method('getBaseUrl')->willReturnCallback(
-            static fn (string $type = UrlInterface::URL_TYPE_LINK, ?bool $secure = null): string =>
-                $type === UrlInterface::URL_TYPE_LINK && $secure === true
-                    ? 'https://shop.test/'
-                    : 'http://shop.test/'
-        );
+        $store->method('getBaseUrl')->willReturn('https://shop.test/');
         $repo = $this->createMock(StoreRepositoryInterface::class);
         $repo->method('getById')->willReturn($store);
 
@@ -152,6 +148,7 @@ class UrlResolverTest extends TestCase
         $select = $this->createMock(Select::class);
         $select->method('from')->willReturnSelf();
         $select->method('where')->willReturnSelf();
+        $select->method('order')->willReturnSelf();
 
         $adapter = $this->createMock(AdapterInterface::class);
         $adapter->method('select')->willReturn($select);
@@ -164,18 +161,40 @@ class UrlResolverTest extends TestCase
         $resource->method('getTableName')->willReturn('url_rewrite');
 
         $store = $this->createMock(Store::class);
-        $store->method('isFrontUrlSecure')->willReturn(true);
-        $store->method('getBaseUrl')->willReturnCallback(
-            static fn (string $type = UrlInterface::URL_TYPE_LINK, ?bool $secure = null): string =>
-                $type === UrlInterface::URL_TYPE_LINK && $secure === true
-                    ? 'https://shop.test/'
-                    : 'http://shop.test/'
-        );
+        $store->method('getBaseUrl')->willReturn('https://shop.test/');
         $repo = $this->createMock(StoreRepositoryInterface::class);
         $repo->method('getById')->willReturn($store);
 
         $resolver = new UrlResolver($resource, $repo);
         $resolver->warmUp(1);
         $resolver->warmUp(1); // second call hits the cache, no second DB call
+    }
+
+    public function testOnlyCanonicalRewritesAreSelectedInStableOrder(): void
+    {
+        // 5.0.0: category-path product URLs (metadata set) must never win.
+        $where = [];
+        $select = $this->createMock(Select::class);
+        $select->method('from')->willReturnSelf();
+        $select->method('where')->willReturnCallback(function (string $cond) use (&$where, &$select) {
+            $where[] = $cond;
+            return $select;
+        });
+        $select->expects(self::once())->method('order')->with('url_rewrite_id ASC')->willReturnSelf();
+
+        $adapter = $this->createMock(AdapterInterface::class);
+        $adapter->method('select')->willReturn($select);
+        $adapter->method('query')->willReturn($this->statementStub([]));
+
+        $resource = $this->createMock(ResourceConnection::class);
+        $resource->method('getConnection')->willReturn($adapter);
+        $resource->method('getTableName')->willReturn('url_rewrite');
+
+        $repo = $this->createMock(StoreRepositoryInterface::class);
+        $repo->method('getById')->willReturn($this->createMock(Store::class));
+
+        (new UrlResolver($resource, $repo))->warmUp(1);
+
+        self::assertContains('metadata IS NULL', $where);
     }
 }

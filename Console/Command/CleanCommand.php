@@ -10,8 +10,8 @@ namespace Angeo\LlmsTxt\Console\Command;
 
 use Angeo\LlmsTxt\Model\Cache\MdMirrorCacheKey;
 use Angeo\LlmsTxt\Model\Output\FilePathResolver;
+use Angeo\LlmsTxt\Model\Output\LegacyOutputCleaner;
 use Magento\Framework\App\CacheInterface;
-use Magento\Framework\App\Filesystem\DirectoryList;
 use Magento\Framework\Filesystem;
 use Magento\Store\Model\StoreManagerInterface;
 use Symfony\Component\Console\Command\Command;
@@ -41,7 +41,8 @@ class CleanCommand extends Command
         private readonly StoreManagerInterface $storeManager,
         private readonly FilePathResolver $pathResolver,
         private readonly Filesystem $filesystem,
-        private readonly CacheInterface $cache
+        private readonly CacheInterface $cache,
+        private readonly LegacyOutputCleaner $legacyCleaner
     ) {
         parent::__construct();
     }
@@ -74,7 +75,7 @@ class CleanCommand extends Command
             ? [$this->storeManager->getStore($storeCode)]
             : $this->storeManager->getStores();
 
-        $directory = $this->filesystem->getDirectoryWrite(DirectoryList::MEDIA);
+        $directory = $this->filesystem->getDirectoryWrite(FilePathResolver::DIRECTORY);
         $deleted = 0;
 
         foreach ($stores as $store) {
@@ -89,6 +90,7 @@ class CleanCommand extends Command
             }
         }
 
+        $deleted += $this->legacyCleaner->clean();
         $this->cache->clean([MdMirrorCacheKey::TAG]);
 
         $output->writeln('');

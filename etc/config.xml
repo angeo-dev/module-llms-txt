@@ -22,6 +22,9 @@
                 <exclude_out_of_stock>0</exclude_out_of_stock>
                 <cms_exclude_identifiers>no-route,enable-cookies,privacy-policy-cookie-restriction-mode</cms_exclude_identifiers>
                 <customer_group_id>0</customer_group_id>
+                <!-- 5.0.0: stores with Catalog Permissions / Shared Catalog /
+                     Website Restrictions active are skipped unless allowed. -->
+                <allow_restricted_catalog>0</allow_restricted_catalog>
             </content>
             <formats>
                 <generate_llms_txt>1</generate_llms_txt>

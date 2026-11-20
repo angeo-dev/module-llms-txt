@@ -129,7 +129,7 @@ class GenerationStatusRepository implements GenerationStatusRepositoryInterface
 
             // Atomic write: tmp + rename so readers never observe a torn file.
             $tmp = self::FILE . '.tmp';
-            $dir->writeFile($tmp, $this->serializer->serialize($this->data));
+            $dir->writeFile($tmp, (string) $this->serializer->serialize($this->data));
             $dir->renameFile($tmp, self::FILE);
         } catch (\Throwable $e) {
             $this->logger->warning(sprintf(

@@ -65,4 +65,27 @@ class RouterTest extends AbstractController
 
         self::assertSame(404, $this->getResponse()->getHttpResponseCode());
     }
+
+    /**
+     * 5.0.0: the standard-router route must not become a second URL.
+     *
+     * @magentoConfigFixture current_store angeo_llms/general/enabled 1
+     * @magentoConfigFixture current_store angeo_llms/formats/generate_llms_txt 1
+     * @magentoConfigFixture current_store angeo_llms/formats/generate_md_mirror 1
+     */
+    public function testDirectControllerRoutesServeNothing(): void
+    {
+        $this->dispatch('/llms/index/mdmirror?md_path=about-us.md');
+        self::assertSame(404, $this->getResponse()->getHttpResponseCode());
+    }
+
+    /**
+     * @magentoConfigFixture current_store angeo_llms/general/enabled 1
+     * @magentoConfigFixture current_store angeo_llms/formats/generate_llms_txt 1
+     */
+    public function testLlmsTxtBelowRootIsNotClaimed(): void
+    {
+        $this->dispatch('/some/deep/path/llms.txt');
+        self::assertNotSame('llms', $this->getRequest()->getModuleName());
+    }
 }

@@ -29,12 +29,8 @@ class OutputContextTest extends TestCase
         $this->store = $this->createMock(Store::class);
         $this->store->method('getId')->willReturn(1);
         $this->store->method('isFrontUrlSecure')->willReturn(true);
-        $this->store->method('getBaseUrl')->willReturnCallback(
-            static fn (string $type = UrlInterface::URL_TYPE_LINK, ?bool $secure = null): string =>
-                $type === UrlInterface::URL_TYPE_LINK && $secure === true
-                    ? 'https://example.test/en/'
-                    : 'http://example.test/'
-        );
+        $this->store->method('getBaseUrl')->with(UrlInterface::URL_TYPE_LINK, true)->willReturn('https://example.test/');
+        $this->store->method('getBaseCurrencyCode')->willReturn('EUR');
         $this->store->method('getCurrentCurrencyCode')->willReturn('USD');
 
         $this->scopeConfig = $this->createMock(ScopeConfigInterface::class);
@@ -83,7 +79,22 @@ class OutputContextTest extends TestCase
             $this->scopeConfig
         );
 
-        self::assertSame('https://example.test/en', $ctx->getBaseUrl());
+        self::assertSame('https://example.test', $ctx->getBaseUrl());
+    }
+
+    public function testCurrencyIsBaseCurrencyNotDisplayCurrency(): void
+    {
+        // 5.0.0: prices come from the price index in base currency; the label
+        // must match them, never the visitor's display currency.
+        $ctx = new OutputContext(
+            $this->store,
+            OutputContextInterface::FORMAT_LLMS_TXT,
+            OutputContextInterface::VERBOSITY_COMPACT,
+            0,
+            $this->scopeConfig
+        );
+
+        self::assertSame('EUR', $ctx->getCurrencyCode());
     }
 
     public function testSharedBag(): void

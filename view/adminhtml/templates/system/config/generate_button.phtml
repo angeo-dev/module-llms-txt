@@ -8,42 +8,50 @@
  * ("Cannot read properties of undefined (reading 'settings')"). We POST via a
  * dynamically-built form in JS instead.
  *
+ * 5.0.0: the script is emitted through SecureHtmlRenderer so it carries the
+ * CSP nonce (strict CSP on the admin in 2.4.7+).
+ *
  * @var \Angeo\LlmsTxt\Block\Adminhtml\System\Config\GenerateButton $block
+ * @var \Magento\Framework\Escaper $escaper
+ * @var \Magento\Framework\View\Helper\SecureHtmlRenderer $secureRenderer
  */
 declare(strict_types=1);
 ?>
 <div class="angeo-llms-actions" style="display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
     <button type="button"
             class="action-default scalable primary"
-            data-angeo-post-url="<?= $block->escapeUrl($block->getGenerateNowUrl()) ?>">
-        <span><?= $block->escapeHtml(__('Generate Now')) ?></span>
+            data-angeo-post-url="<?= $escaper->escapeUrl($block->getGenerateNowUrl()) ?>">
+        <span><?= $escaper->escapeHtml(__('Generate Now')) ?></span>
     </button>
 
     <button type="button"
             class="action-default scalable"
-            data-angeo-post-url="<?= $block->escapeUrl($block->getScheduleUrl()) ?>">
-        <span><?= $block->escapeHtml(__('Schedule (Async)')) ?></span>
+            data-angeo-post-url="<?= $escaper->escapeUrl($block->getScheduleUrl()) ?>">
+        <span><?= $escaper->escapeHtml(__('Schedule (Async)')) ?></span>
     </button>
 
     <p class="note" style="margin:0;">
         <span>
-            <?= $block->escapeHtml(__('"Generate Now" runs synchronously — suitable for small/medium catalogs.')) ?><br/>
-            <?= $block->escapeHtml(__('"Schedule (Async)" queues an immediate cron run — recommended for large catalogs.')) ?>
+            <?= $escaper->escapeHtml(__('"Generate Now" runs synchronously — suitable for small/medium catalogs.')) ?><br/>
+            <?= $escaper->escapeHtml(__('"Schedule (Async)" queues an immediate cron run — recommended for large catalogs.')) ?>
         </span>
     </p>
 </div>
-
-<script>
+<?php
+$formKey = json_encode($block->getFormKey(), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
+$script = <<<JS
 require(['jquery'], function ($) {
     'use strict';
-    var formKey = <?= /* @noEscape */ json_encode($block->getFormKey()) ?>;
+    var formKey = {$formKey};
 
     $('.angeo-llms-actions [data-angeo-post-url]').on('click', function () {
         var url = $(this).data('angeo-post-url'),
-            $form = $('<form>', {method: 'POST', action: url, style: 'display:none;'});
+            \$form = $('<form>', {method: 'POST', action: url, style: 'display:none;'});
 
-        $form.append($('<input>', {type: 'hidden', name: 'form_key', value: formKey}));
-        $form.appendTo('body').trigger('submit');
+        \$form.append($('<input>', {type: 'hidden', name: 'form_key', value: formKey}));
+        \$form.appendTo('body').trigger('submit');
     });
 });
-</script>
+JS;
+?>
+<?= /* @noEscape */ $secureRenderer->renderTag('script', [], $script, false) ?>

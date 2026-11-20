@@ -100,4 +100,15 @@ class HtmlFilterTest extends TestCase
         $out = $this->filter->filter('Price is 5 < 10 EUR', $this->context);
         self::assertSame('Price is 5 < 10 EUR', $out);
     }
+
+    public function testEncodedLessThanInPlainTextSurvives(): void
+    {
+        // 5.0.0: the second strip_tags() pass used to delete "<3 year olds".
+        $filter = new \Angeo\LlmsTxt\Model\Sanitizer\Filter\HtmlFilter();
+        $ctx = $this->createMock(\Angeo\LlmsTxt\Api\OutputContextInterface::class);
+
+        self::assertSame('Fits <3 year olds', $filter->filter('<p>Fits &lt;3 year olds</p>', $ctx));
+        self::assertSame('', $filter->filter('&lt;img src=x onerror=alert(1)&gt;', $ctx));
+        self::assertSame('alert(1)', $filter->filter('&lt;script&gt;x&lt;/script&gt;alert(1)', $ctx));
+    }
 }

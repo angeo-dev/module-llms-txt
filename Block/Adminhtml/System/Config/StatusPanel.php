@@ -16,7 +16,7 @@ use Magento\Framework\Data\Form\Element\AbstractElement;
  * Renders a live-updating status panel in the system config form that shows
  * per-store / per-format generation status (last success, file size, errors).
  *
- * The panel polls /angeo_llms/status/index once per minute via fetch().
+ * The panel polls /angeo_llms/status/index once per minute (jQuery.getJSON).
  *
  * @since 3.0.0
  */

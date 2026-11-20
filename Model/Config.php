@@ -31,7 +31,15 @@ class Config
      *
      * @since 3.3.0
      */
-    public const MODULE_VERSION = '4.3.0';
+    public const MODULE_VERSION = '5.0.0';
+
+    /**
+     * Attribute codes never exported, whatever the configuration says:
+     * internal commercial data that must not end up in a public file.
+     *
+     * @since 5.0.0
+     */
+    public const EXPORT_ATTRIBUTE_DENYLIST = ['cost'];
 
     // ─── General ───────────────────────────────────────────────────────────
     public const XML_PATH_ENABLED            = 'angeo_llms/general/enabled';
@@ -88,6 +96,8 @@ class Config
 
     // ─── HTTP ──────────────────────────────────────────────────────────────
     public const XML_PATH_CACHE_TTL          = 'angeo_llms/http/cache_ttl_seconds';
+    /** @since 5.0.0 */
+    public const XML_PATH_ALLOW_RESTRICTED   = 'angeo_llms/content/allow_restricted_catalog';
 
     // ─── Cron ──────────────────────────────────────────────────────────────
     public const XML_PATH_CRON_SCHEDULE      = 'angeo_llms/cron/schedule';
@@ -448,7 +458,10 @@ class Config
             $codes[] = $brand;
         }
 
-        return $codes;
+        return array_values(array_filter(
+            $codes,
+            static fn (string $code): bool => !in_array(strtolower($code), self::EXPORT_ATTRIBUTE_DENYLIST, true)
+        ));
     }
 
     /** @since 4.0.0 */
@@ -560,6 +573,21 @@ class Config
     {
         return $this->scopeConfig->isSetFlag(
             self::XML_PATH_INVALIDATE_ON_SAVE,
+            ScopeInterface::SCOPE_STORE,
+            $store->getId()
+        );
+    }
+
+    /**
+     * Merchant confirmed that the full catalog may be published even though
+     * Catalog Permissions / Shared Catalog / Website Restrictions are active.
+     *
+     * @since 5.0.0
+     */
+    public function isRestrictedCatalogPublishingAllowed(StoreInterface $store): bool
+    {
+        return $this->scopeConfig->isSetFlag(
+            self::XML_PATH_ALLOW_RESTRICTED,
             ScopeInterface::SCOPE_STORE,
             $store->getId()
         );

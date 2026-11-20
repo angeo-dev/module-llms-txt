@@ -78,10 +78,22 @@ class OutputContext implements OutputContextInterface
         return $this->localeCode;
     }
 
+    /**
+     * Currency the exported prices are expressed in.
+     *
+     * 5.0.0: the BASE currency. Prices come from the price index
+     * (final_price), which is stored in base currency and never converted.
+     * Labelling them with the display/current currency was wrong whenever
+     * the two differ — and in the .md mirror the current currency is the
+     * visitor's choice, so one visitor could make the cached page show the
+     * wrong currency to everyone.
+     */
     public function getCurrencyCode(): string
     {
         if ($this->currencyCode === null) {
-            $code = (string) $this->store->getCurrentCurrencyCode();
+            $code = method_exists($this->store, 'getBaseCurrencyCode')
+                ? (string) $this->store->getBaseCurrencyCode()
+                : '';
             $this->currencyCode = $code !== '' ? $code : (string) $this->store->getDefaultCurrencyCode();
         }
         return $this->currencyCode;
@@ -90,12 +102,26 @@ class OutputContext implements OutputContextInterface
     public function getBaseUrl(): string
     {
         if ($this->baseUrl === null) {
-            $this->baseUrl = rtrim(
-                (string) $this->store->getBaseUrl(UrlInterface::URL_TYPE_LINK, $this->store->isFrontUrlSecure()),
-                '/'
-            );
+            $this->baseUrl = rtrim(self::storefrontBaseUrl($this->store), '/');
         }
         return $this->baseUrl;
+    }
+
+    /**
+     * Storefront link base URL of a store, identical from web, cron and CLI.
+     *
+     * 5.0.0: URL_TYPE_LINK (was URL_TYPE_WEB). WEB never carries the store
+     * code, so with "Add Store Code to URLs" every URL pointed at the default
+     * store. The secure flag is taken from the store's own frontend setting:
+     * from CLI/cron "currently secure" is always false and produced http://.
+     *
+     * @since 5.0.0
+     */
+    public static function storefrontBaseUrl(StoreInterface $store): string
+    {
+        $secure = method_exists($store, 'isFrontUrlSecure') ? (bool) $store->isFrontUrlSecure() : null;
+
+        return (string) $store->getBaseUrl(UrlInterface::URL_TYPE_LINK, $secure);
     }
 
     public function getShared(string $key): mixed

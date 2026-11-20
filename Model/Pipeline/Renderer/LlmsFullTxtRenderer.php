@@ -42,11 +42,11 @@ class LlmsFullTxtRenderer extends AbstractRenderer
     {
         switch ($record->getType()) {
             case EntityRecordInterface::TYPE_STORE:
-                yield "# {$record->getName()}\n\n";
+                yield '# ' . $this->escapeMarkdown($record->getName()) . "\n\n";
                 // A store with no meta description would otherwise emit a
                 // bare "> " — an empty blockquote, which is worse than none:
                 // it looks like a summary to a parser and carries nothing.
-                $summary = trim((string) $record->getSummary());
+                $summary = $this->safeInlineText((string) $record->getSummary());
                 if ($summary !== '') {
                     yield "> {$summary}\n\n";
                 }
@@ -63,7 +63,7 @@ class LlmsFullTxtRenderer extends AbstractRenderer
                 yield sprintf("### %s\n\n", $this->escapeMarkdown($record->getName()));
                 yield $this->publicUrl($record->getUrl(), $context) . "\n\n";
                 if ($record->getContent() !== '') {
-                    yield $record->getContent() . "\n\n";
+                    yield $this->safeBlock($record->getContent()) . "\n\n";
                 }
                 return;
 
@@ -72,7 +72,7 @@ class LlmsFullTxtRenderer extends AbstractRenderer
                 yield sprintf("### %s\n\n", $this->escapeMarkdown($record->getName()));
                 yield $this->publicUrl($record->getUrl(), $context) . "\n\n";
                 if ($record->getContent() !== '') {
-                    yield $record->getContent() . "\n\n";
+                    yield $this->safeBlock($record->getContent()) . "\n\n";
                 }
                 return;
 
@@ -97,16 +97,20 @@ class LlmsFullTxtRenderer extends AbstractRenderer
                     $out .= sprintf("Availability: %s\n\n", $inStock ? 'In stock' : 'Out of stock');
                 }
                 if ($record->getSku() !== null && $record->getSku() !== '') {
-                    $out .= sprintf("SKU: %s\n\n", $record->getSku());
+                    $out .= sprintf("SKU: %s\n\n", $this->escapeMarkdown($record->getSku()));
                 }
                 foreach ($record->getAttributes() as $code => $value) {
-                    $out .= sprintf("%s: %s\n\n", ucfirst(str_replace('_', ' ', (string) $code)), $value);
+                    $out .= sprintf(
+                        "%s: %s\n\n",
+                        $this->escapeMarkdown(ucfirst(str_replace('_', ' ', (string) $code))),
+                        $this->escapeMarkdown((string) $value)
+                    );
                 }
                 if ($record->getImageUrl() !== null) {
                     $out .= sprintf("Image: %s\n\n", $record->getImageUrl());
                 }
-                $short = $record->getShortContent();
-                $desc  = $record->getContent();
+                $short = $this->safeBlock($record->getShortContent());
+                $desc  = $this->safeBlock($record->getContent());
                 if ($short !== '') {
                     $out .= $short . "\n\n";
                 }

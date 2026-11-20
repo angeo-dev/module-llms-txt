@@ -15,7 +15,6 @@ use Magento\Cron\Model\ResourceModel\Schedule\CollectionFactory as ScheduleColle
 use Magento\Cron\Model\Schedule as CronSchedule;
 use Magento\Cron\Model\ScheduleFactory;
 use Magento\Framework\App\Action\HttpPostActionInterface;
-use Magento\Framework\App\ObjectManager;
 use Magento\Framework\Stdlib\DateTime\DateTime;
 use Psr\Log\LoggerInterface;
 
@@ -39,20 +38,15 @@ class Schedule extends Action implements HttpPostActionInterface
 
     private const JOB_CODE = 'angeo_llms_generate';
 
-    private readonly ScheduleResource $scheduleResource;
-
     public function __construct(
         Context $context,
         private readonly ScheduleFactory $scheduleFactory,
         private readonly ScheduleCollectionFactory $scheduleCollectionFactory,
         private readonly DateTime $dateTime,
         private readonly LoggerInterface $logger,
-        ?ScheduleResource $scheduleResource = null
+        private readonly ScheduleResource $scheduleResource
     ) {
         parent::__construct($context);
-        // Optional with a fallback so the constructor stays compatible with 4.3.x.
-        $this->scheduleResource = $scheduleResource
-            ?? ObjectManager::getInstance()->get(ScheduleResource::class);
     }
 
     public function execute()

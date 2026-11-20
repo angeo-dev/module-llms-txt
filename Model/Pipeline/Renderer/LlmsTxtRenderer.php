@@ -50,11 +50,11 @@ class LlmsTxtRenderer extends AbstractRenderer
     {
         switch ($record->getType()) {
             case EntityRecordInterface::TYPE_STORE:
-                yield "# {$record->getName()}\n\n";
+                yield '# ' . $this->escapeMarkdown($record->getName()) . "\n\n";
                 // A store with no meta description would otherwise emit a
                 // bare "> " — an empty blockquote, which is worse than none:
                 // it looks like a summary to a parser and carries nothing.
-                $summary = trim((string) $record->getSummary());
+                $summary = $this->safeInlineText((string) $record->getSummary());
                 if ($summary !== '') {
                     yield "> {$summary}\n\n";
                 }
@@ -73,7 +73,9 @@ class LlmsTxtRenderer extends AbstractRenderer
                     $this->escapeMarkdown($record->getName()),
                     $this->publicUrl($record->getUrl(), $context)
                 );
-                $desc = $this->truncator->truncate($record->getContent(), self::CATEGORY_DESC_MAX);
+                $desc = $this->safeInlineText(
+                    $this->truncator->truncate($record->getContent(), self::CATEGORY_DESC_MAX)
+                );
                 if ($desc !== '') {
                     $line .= ': ' . $desc;
                 }
@@ -87,7 +89,9 @@ class LlmsTxtRenderer extends AbstractRenderer
                     $this->escapeMarkdown($record->getName()),
                     $this->publicUrl($record->getUrl(), $context)
                 );
-                $excerpt = $this->truncator->truncate($record->getContent(), self::CMS_EXCERPT_MAX);
+                $excerpt = $this->safeInlineText(
+                    $this->truncator->truncate($record->getContent(), self::CMS_EXCERPT_MAX)
+                );
                 if ($excerpt !== '') {
                     $line .= ': ' . $excerpt;
                 }
@@ -106,7 +110,9 @@ class LlmsTxtRenderer extends AbstractRenderer
                     $this->publicUrl($record->getUrl(), $context)
                 );
                 $parts = [];
-                $short = $this->truncator->truncate($record->getShortContent(), self::PRODUCT_SHORT_MAX);
+                $short = $this->safeInlineText(
+                    $this->truncator->truncate($record->getShortContent(), self::PRODUCT_SHORT_MAX)
+                );
                 if ($short !== '') {
                     $parts[] = $short;
                 }
