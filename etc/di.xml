@@ -82,6 +82,8 @@
     <type name="Angeo\LlmsTxt\Model\Generator\AgentsMdGenerator">
         <arguments>
             <argument name="sitemapUrlResolver" xsi:type="object">Angeo\LlmsTxt\Model\Output\SitemapUrlResolver</argument>
+            <!-- 5.2.0 -->
+            <argument name="policyPageFinder" xsi:type="object">Angeo\LlmsTxt\Model\Output\PolicyPageFinder</argument>
         </arguments>
     </type>
 

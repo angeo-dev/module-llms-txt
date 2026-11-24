@@ -47,4 +47,10 @@ class AiCatalogLink extends Template
             return null;
         }
     }
+
+    /** The same catalog under its ARD v0.91 name. @since 5.2.0 */
+    public static function ardUrlFor(string $catalogUrl): string
+    {
+        return (string) preg_replace('#/\.well-known/ai-catalog\.json$#', CatalogBuilder::ARD_PATH, $catalogUrl);
+    }
 }

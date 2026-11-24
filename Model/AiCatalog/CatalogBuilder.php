@@ -24,6 +24,12 @@ use Magento\Store\Api\Data\StoreInterface;
  * dropped, identifiers are unique. No valid entry → no catalog (404): an
  * empty catalog tells agents nothing.
  *
+ * 5.2.0 — ARD v0.91 (agenticresourcediscovery.org) reads the same document
+ * from /.well-known/ard.json: it needs only `entries` and ignores the other
+ * top-level members. ARD requires `displayName` on every entry (AI Catalog
+ * makes it optional), so an entry without one gets the host's name, and
+ * `representativeQueries` (2–5 strings) are kept.
+ *
  * @api
  * @since 5.1.0
  */
@@ -32,7 +38,11 @@ class CatalogBuilder
     public const EVENT = 'angeo_ai_catalog_collect';
     public const MEDIA_TYPE = 'application/ai-catalog+json';
     public const SPEC_VERSION = '1.0';
-    private const ENTRY_FIELDS = ['identifier', 'type', 'url', 'data', 'displayName', 'description', 'tags', 'version', 'updatedAt'];
+    private const ENTRY_FIELDS = ['identifier', 'type', 'url', 'data', 'displayName', 'description', 'tags', 'version', 'updatedAt', 'representativeQueries'];
+    /** ARD v0.91: 2–5 example queries per entry. @since 5.2.0 */
+    private const MAX_QUERIES = 5;
+    /** @since 5.2.0 */
+    public const ARD_PATH = '/.well-known/ard.json';
     private const MAX_ENTRIES = 50;
 
     public function __construct(
@@ -77,6 +87,11 @@ class CatalogBuilder
 
         $catalog = ['specVersion' => self::SPEC_VERSION];
         $hostInfo = ['displayName' => $displayName !== '' ? $displayName : ($domain !== '' ? $domain : 'Store')];
+        foreach ($entries as $id => $entry) {
+            if (!isset($entry['displayName']) || trim($entry['displayName']) === '') {
+                $entries[$id]['displayName'] = $hostInfo['displayName'];
+            }
+        }
         if ($domain !== '') {
             $hostInfo['identifier'] = $domain;
         }
@@ -114,8 +129,44 @@ class CatalogBuilder
         if (isset($e['tags']) && (!is_array($e['tags']) || array_filter($e['tags'], 'is_string') !== $e['tags'])) {
             unset($e['tags']);
         }
+        if (array_key_exists('representativeQueries', $e)) {
+            $queries = self::queries($e['representativeQueries']);
+            if ($queries === []) {
+                unset($e['representativeQueries']);
+            } else {
+                $e['representativeQueries'] = $queries;
+            }
+        }
 
         return $e;
+    }
+
+    /**
+     * Up to five distinct, non-empty strings, or none when fewer than two
+     * remain (ARD asks for 2–5).
+     *
+     * @return list<string>
+     */
+    private static function queries(mixed $raw): array
+    {
+        if (!is_array($raw)) {
+            return [];
+        }
+        $out = [];
+        foreach ($raw as $q) {
+            if (!is_string($q)) {
+                continue;
+            }
+            $q = trim(mb_substr($q, 0, 200));
+            if ($q !== '' && !in_array($q, $out, true)) {
+                $out[] = $q;
+            }
+            if (count($out) >= self::MAX_QUERIES) {
+                break;
+            }
+        }
+
+        return count($out) >= 2 ? $out : [];
     }
 
     private static function hostName(StoreInterface $store): string

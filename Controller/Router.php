@@ -30,6 +30,7 @@ use Psr\Log\LoggerInterface;
  *   /llms-full.jsonl → Index controller, file=llms-full.jsonl (alias of .jsonl)
  *   /agents.md       → Index controller, file=agents.md (since 3.4.0)
  *   /sitemap_agentic_discovery.xml → AgenticSitemap controller (since 4.0.0)
+ *   /.well-known/ai-catalog.json, /.well-known/ard.json → AiCatalog (5.1.0, 5.2.0)
  *   /{path}.md       → MdMirror controller (when md_mirror is enabled)
  *
  * Multi-store: Magento's store resolution has already run and removed the
@@ -60,6 +61,9 @@ class Router implements RouterInterface
 
     /** @since 5.1.0 */
     private const AI_CATALOG = '.well-known/ai-catalog.json';
+
+    /** Same document under its ARD v0.91 name. @since 5.2.0 */
+    private const ARD = '.well-known/ard.json';
 
     private const FILE_ROUTES = [
         'llms.txt'        => true,
@@ -97,7 +101,7 @@ class Router implements RouterInterface
         $isRoot = $lastSlash === false;
 
         // 5.1.0: the AI Catalog lives under /.well-known/, at the domain root.
-        if ($path === self::AI_CATALOG) {
+        if ($path === self::AI_CATALOG || $path === self::ARD) {
             $request
                 ->setModuleName('llms')
                 ->setControllerName('index')

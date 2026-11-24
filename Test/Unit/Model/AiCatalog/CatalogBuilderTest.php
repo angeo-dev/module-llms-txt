@@ -28,7 +28,27 @@ class CatalogBuilderTest extends TestCase
 
         self::assertSame('1.0', $catalog['specVersion']);
         self::assertSame(['displayName' => 'Example Shop', 'identifier' => 'shop.example.com'], $catalog['host']);
-        self::assertSame([self::MCP], $catalog['entries']);
+        // 5.2.0: ARD needs displayName on every entry; the host name fills it.
+        self::assertSame([self::MCP + ['displayName' => 'Example Shop']], $catalog['entries']);
+    }
+
+    public function testArdFieldsAreKept(): void
+    {
+        $catalog = CatalogBuilder::assemble([self::MCP + [
+            'displayName' => 'Shop MCP',
+            'representativeQueries' => [' find a tee ', 'find a tee', 3, 'check stock', 'a', 'b', 'c', 'd'],
+        ]], 'Shop', 'shop.example.com');
+        $entry = $catalog['entries'][0];
+
+        self::assertSame('Shop MCP', $entry['displayName']);
+        self::assertSame(['find a tee', 'check stock', 'a', 'b', 'c'], $entry['representativeQueries']);
+    }
+
+    public function testOneQueryIsNotEnough(): void
+    {
+        $catalog = CatalogBuilder::assemble([self::MCP + ['representativeQueries' => ['only one']]], 'Shop', 'shop.example.com');
+
+        self::assertArrayNotHasKey('representativeQueries', $catalog['entries'][0]);
     }
 
     public function testInvalidEntriesAreDropped(): void
@@ -57,7 +77,7 @@ class CatalogBuilderTest extends TestCase
         $entry = $catalog['entries'][0];
 
         self::assertArrayNotHasKey('secret', $entry);
-        self::assertArrayNotHasKey('displayName', $entry);
+        self::assertSame('Shop', $entry['displayName']); // bad value dropped, host name used (5.2.0)
         self::assertArrayNotHasKey('tags', $entry);
         self::assertSame('Store MCP', $entry['description']);
     }

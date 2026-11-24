@@ -463,6 +463,26 @@ public function execute(\Magento\Framework\Event\Observer $observer): void
 With no entries the URL answers 404 and no `<link rel="ai-catalog">` is added.
 Turn it off with *Generate AI Catalog* = No.
 
+## Agent discovery headers and markdown negotiation (5.2.0)
+
+- Every storefront HTML page sends
+  `Link: <…/llms.txt>; rel="describedby"; type="text/plain", <…/.well-known/ai-catalog.json>; rel="ai-catalog"`.
+- With *Markdown Content Negotiation* on, `Accept: text/markdown` gets the
+  page's `.md` mirror (home page: the home CMS page). HTML pages then send
+  `Vary: Accept`.
+
+Varnish (Magento's `default.vcl`) — add to `sub vcl_hash`:
+
+```vcl
+if (req.http.Accept ~ "text/markdown") {
+    hash_data("md");
+}
+```
+
+Fastly: the same in a `vcl_hash` snippet. Without it a cached HTML page can be
+returned to an agent that asked for markdown (never the other way round: the
+markdown answer is `private`).
+
 ## Events
 
 Hook in via observers — three events are dispatched per store/format pass:

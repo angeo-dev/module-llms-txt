@@ -12,7 +12,18 @@
                          only claims paths that would otherwise 404. -->
                     <item name="sortOrder" xsi:type="string">70</item>
                 </item>
+                <!-- 5.2.0: rewrites Accept: text/markdown requests to the .md
+                     mirror before urlrewrite (20) runs. Never matches itself. -->
+                <item name="angeo_llms_md_negotiation" xsi:type="array">
+                    <item name="class"     xsi:type="string">Angeo\LlmsTxt\Controller\MarkdownNegotiationRouter</item>
+                    <item name="disable"   xsi:type="boolean">false</item>
+                    <item name="sortOrder" xsi:type="string">15</item>
+                </item>
             </argument>
         </arguments>
+    </type>
+    <!-- 5.2.0: markdown requests get their own built-in FPC key. -->
+    <type name="Magento\Framework\App\PageCache\Identifier">
+        <plugin name="angeo_llms_md_vary" type="Angeo\LlmsTxt\Plugin\PageCacheMarkdownVary"/>
     </type>
 </config>

@@ -230,7 +230,12 @@ class MdMirror implements ActionInterface, HttpGetActionInterface
     ): Raw {
         $result = $this->resultRawFactory->create();
         $result->setHeader('Content-Type', 'text/markdown; charset=utf-8', true);
-        if ($tags !== '') {
+        // 5.2.0: an answer to Accept: text/markdown on the HTML URL. A shared
+        // cache must never keep it under that URL, so no cache tags, private.
+        $negotiated = (string) $this->request->getParam(
+            \Angeo\LlmsTxt\Controller\MarkdownNegotiationRouter::PARAM_NEGOTIATED
+        ) === '1';
+        if ($tags !== '' && !$negotiated) {
             $result->setHeader('X-Magento-Tags', $tags, true);
         }
         // llms.txt v2: the Link: header form works for non-HTML resources, so
@@ -244,10 +249,13 @@ class MdMirror implements ActionInterface, HttpGetActionInterface
             );
         }
         $result->setHeader('Content-Length', (string) strlen($markdown), true);
-        $result->setHeader('Cache-Control', sprintf(
+        $result->setHeader('Cache-Control', $negotiated ? 'private, max-age=0' : sprintf(
             'public, max-age=%d',
             $this->config->getHttpCacheTtl()
         ), true);
+        if ($negotiated) {
+            $result->setHeader('Vary', 'Accept', true);
+        }
         $result->setHeader('X-Content-Type-Options', 'nosniff', true);
         $result->setHeader('X-Robots-Tag', 'noindex, follow', true);
         $result->setContents($markdown);

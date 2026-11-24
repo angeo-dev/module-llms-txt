@@ -179,6 +179,13 @@
                     <comment><![CDATA[Serves an operator's manual for AI agents at <code>/agents.md</code> — interaction rules plus links to this store's machine-readable surfaces (llms.txt, UCP profile, MCP endpoint when the sibling Angeo modules are installed). Follows the storefront convention Shopify rolled out to all stores in May 2026. Also appends a "For Agents & Developers" section to llms.txt.]]></comment>
                 </field>
 
+                <field id="md_negotiation" translate="label comment" type="select" sortOrder="45"
+                       showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Markdown Content Negotiation</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <depends><field id="generate_md_mirror">1</field></depends>
+                    <comment><![CDATA[A request with <code>Accept: text/markdown</code> for a product, category or CMS page (and the home page) gets its markdown mirror; browsers keep getting HTML. HTML pages then send <code>Vary: Accept</code>. On Varnish or Fastly also add <code>Accept</code> to the cache key — see the README.]]></comment>
+                </field>
                 <field id="emit_link_relations" translate="label comment" type="select" sortOrder="50"
                        showInDefault="1" showInWebsite="1" showInStore="1">
                     <label>Emit Link Relations</label>

@@ -54,7 +54,8 @@ class AgentsMdGenerator
         private readonly ScopeConfigInterface $scopeConfig,
         private readonly LoggerInterface $logger,
         private readonly RestrictedCatalogGuard $restrictedGuard,
-        private readonly ?\Angeo\LlmsTxt\Model\Output\SitemapUrlResolver $sitemapUrlResolver = null
+        private readonly ?\Angeo\LlmsTxt\Model\Output\SitemapUrlResolver $sitemapUrlResolver = null,
+        private readonly ?\Angeo\LlmsTxt\Model\Output\PolicyPageFinder $policyPageFinder = null
     ) {
     }
 
@@ -193,7 +194,13 @@ class AgentsMdGenerator
     private function resolvePages(StoreInterface $store, string $baseUrl): array
     {
         $out = [];
-        foreach ($this->config->getAgentsPageLinks($store) as $label => $value) {
+        $configured = $this->config->getAgentsPageLinks($store);
+        // 5.2.0: delivery / returns / privacy found among the CMS pages when
+        // the setting is empty. The setting always wins.
+        if ($this->policyPageFinder !== null) {
+            $configured += $this->policyPageFinder->find($store, array_keys($configured));
+        }
+        foreach ($configured as $label => $value) {
             $out[$label] = preg_match('~^https?://~i', $value) === 1
                 ? $value
                 : rtrim($baseUrl, '/') . '/' . ltrim($value, '/');

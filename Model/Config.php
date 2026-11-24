@@ -31,7 +31,7 @@ class Config
      *
      * @since 3.3.0
      */
-    public const MODULE_VERSION = '5.1.0';
+    public const MODULE_VERSION = '5.2.0';
 
     /**
      * Attribute codes never exported, whatever the configuration says:
@@ -68,6 +68,8 @@ class Config
     public const XML_PATH_AGENTIC_SITEMAP    = 'angeo_llms/formats/generate_agentic_sitemap';
     /** @since 5.1.0 */
     public const XML_PATH_AI_CATALOG         = 'angeo_llms/formats/generate_ai_catalog';
+    /** @since 5.2.0 */
+    public const XML_PATH_MD_NEGOTIATION     = 'angeo_llms/formats/md_negotiation';
 
     // ─── Product data (4.0.0) ──────────────────────────────────────────────
     public const XML_PATH_PD_ATTRIBUTES      = 'angeo_llms/product_data/export_attributes';
@@ -432,6 +434,20 @@ class Config
      *
      * @since 4.0.0
      */
+    /**
+     * Answer `Accept: text/markdown` on product, category and CMS pages with
+     * the markdown mirror. Needs the mirrors. @since 5.2.0
+     */
+    public function isMdNegotiationEnabled(StoreInterface $store): bool
+    {
+        return $this->isMdMirrorEnabled($store)
+            && $this->scopeConfig->isSetFlag(
+                self::XML_PATH_MD_NEGOTIATION,
+                ScopeInterface::SCOPE_STORE,
+                $store->getId()
+            );
+    }
+
     /** /.well-known/ai-catalog.json and its rel="ai-catalog" link. @since 5.1.0 */
     public function isAiCatalogEnabled(StoreInterface $store): bool
     {

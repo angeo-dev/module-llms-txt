@@ -11,3 +11,4 @@ if ($url === null) {
 }
 ?>
 <link rel="ai-catalog" type="application/ai-catalog+json" href="<?= $escaper->escapeUrl($url) ?>"/>
+<link rel="ard" type="application/json" href="<?= $escaper->escapeUrl($block::ardUrlFor($url)) ?>"/>

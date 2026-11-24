@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [5.2.0] — 2026-11-23
+
+Fixes for what isitagentready.com and AEO Audit reported on demo.angeo.dev.
+
+### Added
+
+- **ARD v0.91.** The AI Catalog is also served at `/.well-known/ard.json`
+  (as `application/json`), with `<link rel="ard">` next to `rel="ai-catalog"`.
+  ARD requires `displayName` on every entry: an entry without one gets the
+  store's name. `representativeQueries` (2–5 strings) are kept; before they
+  were dropped as unknown members.
+- **Link header (RFC 8288) on HTML pages:** `llms.txt` as `rel="describedby"`
+  and the AI Catalog as `rel="ai-catalog"`. Agents that read headers first
+  find them without parsing HTML. Existing Link values are kept. Follows
+  *Emit Link Relations* and *Serve AI Catalog*.
+- **Markdown content negotiation** (*Formats → Markdown Content Negotiation*,
+  off by default, needs the `.md` mirrors). `Accept: text/markdown` on a
+  product, category or CMS page, or the home page, returns its mirror with
+  `Vary: Accept` and `Cache-Control: private`. Browsers keep getting HTML.
+  The built-in page cache keys markdown requests apart; for Varnish/Fastly
+  see the README.
+- **agents.md finds the delivery, returns and privacy pages** among active CMS
+  pages when *Key Pages* is empty (`shipping-policy`, `returns`,
+  `privacy-policy`, `verzending`, `datenschutz`, …). A configured value always
+  wins.
+
 ## [5.1.0] — 2026-11-09
 
 ### Added

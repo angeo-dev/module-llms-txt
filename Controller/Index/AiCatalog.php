@@ -15,7 +15,8 @@ use Magento\Store\Model\StoreManagerInterface;
 use Psr\Log\LoggerInterface;
 
 /**
- * GET /.well-known/ai-catalog.json (5.1.0).
+ * GET /.well-known/ai-catalog.json (5.1.0) and /.well-known/ard.json (5.2.0,
+ * the ARD v0.91 name; same document, served as application/json).
  *
  * 404 when the module or the catalog is off for the store, the store is
  * excluded or restricted, or no module offered an entry.
@@ -37,7 +38,9 @@ class AiCatalog implements ActionInterface, HttpGetActionInterface
     {
         try {
             $store = $this->storeManager->getStore();
-            if (trim((string) $this->request->getPathInfo(), '/') !== '.well-known/ai-catalog.json'
+            $path = trim((string) $this->request->getPathInfo(), '/');
+            $isArd = $path === ltrim(CatalogBuilder::ARD_PATH, '/');
+            if (($path !== '.well-known/ai-catalog.json' && !$isArd)
                 || !$this->config->isEnabled($store)
                 || $this->config->isStoreExcluded($store)
                 || $this->restrictedGuard->isBlocked($store)
@@ -50,7 +53,7 @@ class AiCatalog implements ActionInterface, HttpGetActionInterface
             }
 
             $result = $this->resultRawFactory->create();
-            $result->setHeader('Content-Type', CatalogBuilder::MEDIA_TYPE, true);
+            $result->setHeader('Content-Type', $isArd ? 'application/json' : CatalogBuilder::MEDIA_TYPE, true);
             $result->setHeader('X-Content-Type-Options', 'nosniff', true);
             $result->setHeader('Access-Control-Allow-Origin', '*', true);
             $result->setHeader('Cache-Control', sprintf('public, max-age=%d', $this->config->getHttpCacheTtl()), true);

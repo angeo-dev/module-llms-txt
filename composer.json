@@ -86,5 +86,5 @@
             "php-http/discovery": false
         }
     },
-    "version": "5.1.0"
+    "version": "5.2.0"
 }

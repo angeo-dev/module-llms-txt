@@ -36,6 +36,8 @@
                 <emit_link_relations>1</emit_link_relations>
                 <!-- 5.1.0: published only when another module adds an entry. -->
                 <generate_ai_catalog>1</generate_ai_catalog>
+                <!-- 5.2.0: off by default — changes how HTML pages are cached (Vary: Accept). -->
+                <md_negotiation>0</md_negotiation>
                 <link_to_md>1</link_to_md>
                 <generate_agentic_sitemap>1</generate_agentic_sitemap>
             </formats>
